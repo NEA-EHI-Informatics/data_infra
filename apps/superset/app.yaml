@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: superset
+  namespace: argocd
+spec:
+  destination:
+    namespace: superset
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    repoURL: http://apache.github.io/superset/
+    targetRevision: 0.12.11
+    chart: superset
+    helm:
+      releaseName: superset
+      valuesObject:
+        service:
+          type: ClusterIP
+        postgresql:
+          enabled: true
+          auth:
+            existingSecret: superset-db-secret  # Secret containing PostgreSQL credentials
+            database: superset  # The database name remains as 'superset'
+
+        redis:
+          enabled: true
+          auth:
+            enabled: true
+            existingSecret: superset-db-secret  # Secret containing Redis credentials
+            existingSecretKey: redis-password  # The key in the secret for Redis password
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+
