@@ -1,6 +1,6 @@
 # data_infra
 
-All required for setting data infra with Apache tools
+All neccessary tooling required for data infra with Apache Superset (Visualisation), Trino and Unity Catalog, Apache Iceberg (Using Iceberg)
 
 
 
