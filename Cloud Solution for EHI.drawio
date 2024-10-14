@@ -96,19 +96,40 @@
         <mxCell id="Id2GFOL8waCKAzLqxOHo-9" value="Production Environment" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
           <mxGeometry x="850" y="520" width="60" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="Id2GFOL8waCKAzLqxOHo-10" value="Sequencing Machine" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+        <mxCell id="Id2GFOL8waCKAzLqxOHo-19" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="Id2GFOL8waCKAzLqxOHo-10" target="lLLo2-wop7eWEY_Mccak-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Id2GFOL8waCKAzLqxOHo-10" value="Sequencing Machine&lt;br&gt;(Other scientific machine signals)" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
           <mxGeometry x="720" y="90" width="120" height="50" as="geometry" />
         </mxCell>
         <mxCell id="Id2GFOL8waCKAzLqxOHo-16" value=".fasta&lt;div&gt;.fasq&lt;/div&gt;&lt;div&gt;.bam&lt;/div&gt;" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;" vertex="1" parent="1">
           <mxGeometry x="100" y="90" width="120" height="80" as="geometry" />
         </mxCell>
         <mxCell id="Id2GFOL8waCKAzLqxOHo-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.75;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="lLLo2-wop7eWEY_Mccak-20" target="lLLo2-wop7eWEY_Mccak-1">
-          <mxGeometry relative="1" as="geometry" />
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="780" y="220" />
+              <mxPoint x="85" y="220" />
+            </Array>
+          </mxGeometry>
         </mxCell>
         <mxCell id="Id2GFOL8waCKAzLqxOHo-18" value="Self upload genomics files" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="Id2GFOL8waCKAzLqxOHo-17">
           <mxGeometry x="-0.2642" y="-2" relative="1" as="geometry">
-            <mxPoint as="offset" />
+            <mxPoint x="-3" y="42" as="offset" />
           </mxGeometry>
+        </mxCell>
+        <mxCell id="Id2GFOL8waCKAzLqxOHo-20" value="" style="verticalLabelPosition=bottom;html=1;verticalAlign=top;align=center;strokeColor=none;fillColor=#00BEF2;shape=mxgraph.azure.virtual_machine;" vertex="1" parent="1">
+          <mxGeometry x="490" y="150" width="70" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="Id2GFOL8waCKAzLqxOHo-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.25;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="Id2GFOL8waCKAzLqxOHo-20" target="lLLo2-wop7eWEY_Mccak-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="55" y="190" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Id2GFOL8waCKAzLqxOHo-22" value="Run scientific workflows" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="560" y="160" width="60" height="30" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
