@@ -4,11 +4,86 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
+        <mxCell id="lLLo2-wop7eWEY_Mccak-6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=classic;startFill=1;" edge="1" parent="1" source="lLLo2-wop7eWEY_Mccak-1" target="lLLo2-wop7eWEY_Mccak-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
         <mxCell id="lLLo2-wop7eWEY_Mccak-1" value="" style="verticalLabelPosition=bottom;html=1;verticalAlign=top;align=center;strokeColor=none;fillColor=#00BEF2;shape=mxgraph.azure.storage_blob;" vertex="1" parent="1">
-          <mxGeometry x="140" y="270" width="50" height="45" as="geometry" />
+          <mxGeometry x="40" y="296.5" width="60" height="55" as="geometry" />
         </mxCell>
         <mxCell id="lLLo2-wop7eWEY_Mccak-2" value="Azure Blob" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
-          <mxGeometry x="140" y="315" width="60" height="30" as="geometry" />
+          <mxGeometry x="40" y="358" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=classic;startFill=1;" edge="1" parent="1" source="lLLo2-wop7eWEY_Mccak-3" target="lLLo2-wop7eWEY_Mccak-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-3" value="" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/analytics/Azure_Databricks.svg;" vertex="1" parent="1">
+          <mxGeometry x="190" y="290" width="62.8" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-4" value="dbfs:/" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="194.20000000000002" y="358" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-7" value="Mount" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="110" y="321.5" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-9" value="Unity Catalog&lt;div&gt;(Metastore)&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Maps tables with the location where it&#39;s stored in Azure Blob&lt;/div&gt;" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/analytics/Azure_Databricks.svg;" vertex="1" parent="1">
+          <mxGeometry x="320" y="290" width="62.8" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-10" value="&lt;div&gt;Cloud Notebook&lt;/div&gt;" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/analytics/Azure_Databricks.svg;" vertex="1" parent="1">
+          <mxGeometry x="460" y="190" width="62.8" height="68" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=classic;startFill=1;" edge="1" parent="1" source="lLLo2-wop7eWEY_Mccak-10" target="lLLo2-wop7eWEY_Mccak-9">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="440" y="224" />
+              <mxPoint x="440" y="320" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;startArrow=classic;startFill=1;" edge="1" parent="1" source="lLLo2-wop7eWEY_Mccak-14" target="lLLo2-wop7eWEY_Mccak-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-14" value="Analyst" style="verticalLabelPosition=bottom;html=1;verticalAlign=top;align=center;strokeColor=none;fillColor=#00BEF2;shape=mxgraph.azure.laptop;pointerEvents=1;" vertex="1" parent="1">
+          <mxGeometry x="600" y="170" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-17" value="Read / Write" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="120" y="290" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-20" value="Scientist&amp;nbsp;" style="verticalLabelPosition=bottom;html=1;verticalAlign=top;align=center;strokeColor=none;fillColor=#00BEF2;shape=mxgraph.azure.laptop;pointerEvents=1;" vertex="1" parent="1">
+          <mxGeometry x="590" y="50" width="70" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="lLLo2-wop7eWEY_Mccak-20" target="lLLo2-wop7eWEY_Mccak-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-23" value="Write and Read binary Files (genomic .fasta, fastq, BAM files)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="lLLo2-wop7eWEY_Mccak-22">
+          <mxGeometry x="-0.0097" y="-4" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-24" value="Data Query and Visualisation Tool&amp;nbsp;&lt;div&gt;(eg. BIS)&lt;/div&gt;" style="image;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/azure2/general/Dashboard2.svg;" vertex="1" parent="1">
+          <mxGeometry x="680" y="451" width="69.42" height="49" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-28" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;startArrow=classic;startFill=1;" edge="1" parent="1" source="lLLo2-wop7eWEY_Mccak-25" target="lLLo2-wop7eWEY_Mccak-24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-25" value="Azure Cloud SQL&lt;div&gt;(Cloud instance will&amp;nbsp;&lt;/div&gt;&lt;div&gt;have it&#39;s own storage&lt;/div&gt;&lt;div&gt;&amp;nbsp;and it&#39;s not exposed&amp;nbsp;&lt;/div&gt;&lt;div&gt;as a Azure blob)&lt;/div&gt;" style="image;sketch=0;aspect=fixed;html=1;points=[];align=center;fontSize=12;image=img/lib/mscae/SQL_Database_generic.svg;" vertex="1" parent="1">
+          <mxGeometry x="536" y="451" width="38" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="lLLo2-wop7eWEY_Mccak-10" target="lLLo2-wop7eWEY_Mccak-25">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="560" y="224" />
+              <mxPoint x="560" y="450" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-27" value="&lt;div&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;* Model Prediction Results&amp;nbsp;&lt;/span&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;* Summary Statistics&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="570" y="338" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-30" value="Operations / Non technical Users" style="verticalLabelPosition=bottom;html=1;verticalAlign=top;align=center;strokeColor=none;fillColor=#00BEF2;shape=mxgraph.azure.laptop;pointerEvents=1;" vertex="1" parent="1">
+          <mxGeometry x="890" y="460.5" width="50" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lLLo2-wop7eWEY_Mccak-31" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.08;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="lLLo2-wop7eWEY_Mccak-24" target="lLLo2-wop7eWEY_Mccak-30">
+          <mxGeometry relative="1" as="geometry" />
         </mxCell>
       </root>
     </mxGraphModel>
