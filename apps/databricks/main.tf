@@ -2,6 +2,9 @@ terraform {
   required_providers {
     azurerm = "~> 4.0"
     random  = "~> 3.6"
+    databricks = {
+      source = "databricks/databricks"
+    }
   }
 }
 
@@ -17,10 +20,4 @@ locals {
     Environment = "stg"
     Owner       = "nea-ehi"
   }
-}
-
-resource "azurerm_resource_group" "this" {
-  name     = "${local.prefix}-rg"
-  location = var.region
-  tags     = local.tags
 }
