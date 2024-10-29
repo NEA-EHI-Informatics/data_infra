@@ -1,6 +1,5 @@
-# Blob Storage Account
 resource "azurerm_storage_account" "blob_storage" {
-  name                     = "nea-ehi-blobstorage"
+  name                     = "eetd"
   resource_group_name      = azurerm_resource_group.storage_rg.name
   location                 = azurerm_resource_group.storage_rg.location
   account_tier             = "Standard"
@@ -16,10 +15,10 @@ resource "azurerm_storage_account" "blob_storage" {
     	division = "stg"
   	}
   )
+}
 
-# Blob Container
 resource "azurerm_storage_container" "blob_container" {
-  name                  = "EETD"
+  name                  = "eetd"
   storage_account_name  = azurerm_storage_account.blob_storage.name
   container_access_type = "private"
 }

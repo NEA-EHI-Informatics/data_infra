@@ -1,14 +1,35 @@
-resource "azurerm_databricks_workspace" "workspaces" {
-  for_each                   = var.workspaces
-  name                       = each.key
-  resource_group_name        = "${each.key}-rg"
-  location                   = each.value.location
-  sku                        = each.value.sku
+resource "azurerm_databricks_workspace" "mmed-workspaces" {
+  name                       = "mmed"
+  resource_group_name        = azurerm_resource_group.this.name
+  location                   = var.region
+  sku                        = "trial"
   managed_resource_group_name = azurerm_resource_group.this.name
   tags = merge(
     local.tags,
     {
-      Department = each.key
+      Division = "mmed"
+    }
+  )
+  custom_parameters {
+    no_public_ip                                         = var.no_public_ip
+    virtual_network_id                                   = azurerm_virtual_network.this.id
+    private_subnet_name                                  = azurerm_subnet.private.name
+    public_subnet_name                                   = azurerm_subnet.public.name
+    public_subnet_network_security_group_association_id  = azurerm_subnet_network_security_group_association.public.id
+    private_subnet_network_security_group_association_id = azurerm_subnet_network_security_group_association.private.id
+  }
+}
+
+resource "azurerm_databricks_workspace" "eetd-workspaces" {
+  name                       = "eetd"
+  resource_group_name        = azurerm_resource_group.this.name
+  location                   = var.region
+  sku                        = "trial"
+  managed_resource_group_name = azurerm_resource_group.this.name
+  tags = merge(
+    local.tags,
+    {
+      Division = "eetd"
     }
   )
   custom_parameters {
@@ -26,9 +47,6 @@ resource "azurerm_resource_group" "this" {
   location = var.region
   tags = merge(
     local.tags,
-    {
-      Department = each.key
-    }
   )
 }
 

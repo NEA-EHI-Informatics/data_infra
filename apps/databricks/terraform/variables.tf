@@ -13,8 +13,3 @@ variable "no_public_ip" {
   default     = true
   description = "Defines whether Secure Cluster Connectivity (No Public IP) should be enabled."
 }
-
-variable "workspaces" {
-  type    = list(string)
-  default = ["EETD", "MMED"]
-}
