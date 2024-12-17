@@ -10,27 +10,47 @@ spec:
   project: default
   source:
     repoURL: http://apache.github.io/superset/
-    targetRevision: 0.12.11
+    targetRevision: 0.13.4
     chart: superset
     helm:
       releaseName: superset
       valuesObject:
-        service:
-          type: ClusterIP
-        postgresql:
-          enabled: true
-          auth:
-            existingSecret: superset-db-secret  # Secret containing PostgreSQL credentials
-            database: superset  # The database name remains as 'superset'
+        bootstrapScript: |
+          #!/bin/bash
+          pip install \
+            "psycopg2-binary>=2.9.10" pillow \
+            &&\
+          if [ ! -f ~/bootstrap ]; then echo "Running Superset with uid {{ .Values.runAsUser }}" > ~/bootstrap; fi
+        supersetNode:
+          extraContainers:
+            - name: tailscale-sidecar
+              image: ghcr.io/tailscale/tailscale:latest
+              env:
+                - name: TS_KUBE_SECRET
+                  value: tailscale-auth
+                - name: TS_AUTHKEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: tailscale-auth
+                      key: TS_AUTHKEY
+                - name: TS_USERSPACE
+                  value: "false"
+              securityContext:
+                capabilities:
+                   add:
+                    - NET_ADMIN
+        extraSecretEnv:
+          SUPERSET_SECRET_KEY: <REDACTED>
+        configOverrides:
+          my_overrides: |
+            ENABLE_PROXY_FIX = True
+            FEATURE_FLAGS = {
+             'ENABLE_TEMPLATE_PROCESSING': True
+            }
 
-        redis:
-          enabled: true
-          auth:
-            enabled: true
-            existingSecret: superset-db-secret  # Secret containing Redis credentials
-            existingSecretKey: redis-password  # The key in the secret for Redis password
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
-
+    syncOptions:
+    - CreateNamespace=true
