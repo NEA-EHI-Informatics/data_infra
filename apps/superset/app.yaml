@@ -7,7 +7,7 @@ spec:
   destination:
     namespace: superset
     server: https://kubernetes.default.svc
-  project: default
+  project: data
   source:
     repoURL: http://apache.github.io/superset/
     targetRevision: 0.13.4
@@ -21,6 +21,9 @@ spec:
             "psycopg2-binary>=2.9.10" pillow \
             &&\
           if [ ! -f ~/bootstrap ]; then echo "Running Superset with uid {{ .Values.runAsUser }}" > ~/bootstrap; fi
+        service:
+          type: ClusterIP
+          port: 80
         supersetNode:
           extraContainers:
             - name: tailscale-sidecar
