@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: data
+  namespace: argocd # Use the namespace where ArgoCD is installed
+spec:
+  description: Data-related applications managed by ArgoCD
+  sourceRepos:
+    - '*' # Allows access to all repositories; adjust as needed for specific repos
+  destinations:
+    - namespace: '*' # Allows deployment to any namespace; adjust as needed
+      server: '*'     # Allows deployment to any cluster; adjust as needed
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceBlacklist:
+    - group: ''
+      kind: ResourceQuota
+    - group: ''
+      kind: LimitRange
+  syncWindows: [] # Define sync windows if needed
+  roles: []        # Define roles for RBAC if needed
+
