@@ -33,10 +33,7 @@ spec:
                   - name: TS_USERSPACE
                     value: "false"
                 securityContext:
-                  capabilities:
-                     add:
-                      - NET_ADMIN
-
+                  privileged: true
         statsd:
           enabled: false
         createUserJob:
