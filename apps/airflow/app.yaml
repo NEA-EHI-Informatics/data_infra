@@ -32,6 +32,11 @@ spec:
                         key: TS_AUTHKEY
                   - name: TS_USERSPACE
                     value: "false"
+                securityContext:
+                  capabilities:
+                     add:
+                      - NET_ADMIN
+
         statsd:
           enabled: false
         createUserJob:
