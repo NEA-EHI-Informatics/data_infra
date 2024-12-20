@@ -7,13 +7,25 @@ spec:
   destination:
     namespace: airflow
     server: https://kubernetes.default.svc
-  project: default
+  project: data
   source:
     repoURL: http://airflow.apache.org/
     targetRevision: 1.15.0
     chart: airflow
     helm:
       releaseName: airflow
+      valuesObject:
+        images:
+          migrationsWaitTimeout: 600
+          useDefaultImageForMigration: true
+        statsd:
+          enabled: false
+        createUserJob:
+          useHelmHooks: false
+          applyCustomEnv: false
+        migrateDatabaseJob:
+          useHelmHooks: false
+          applyCustomEnv: false
   syncPolicy:
     automated:
       prune: true
