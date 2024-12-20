@@ -18,6 +18,20 @@ spec:
         images:
           migrationsWaitTimeout: 600
           useDefaultImageForMigration: true
+        webserver:
+            extraContainers:
+              - name: tailscale-sidecar
+                image: ghcr.io/tailscale/tailscale:latest
+                env:
+                  - name: TS_KUBE_SECRET
+                    value: tailscale-auth
+                  - name: TS_AUTHKEY
+                    valueFrom:
+                      secretKeyRef:
+                        name: tailscale-auth
+                        key: TS_AUTHKEY
+                  - name: TS_USERSPACE
+                    value: "false"
         statsd:
           enabled: false
         createUserJob:
