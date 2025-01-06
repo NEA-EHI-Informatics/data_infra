@@ -36,6 +36,13 @@ spec:
             "argocd.argoproj.io/hook": Sync
           useHelmHooks: false
           applyCustomEnv: false
+        dags:
+          gitSync:
+            enabled: true
+            repo: https://github.com/NEA-EHI-Informatics/airflow
+            branch: production
+            credentialsSecret: git-credentials
+            subPath: dags
   syncPolicy:
     automated:
       prune: true
