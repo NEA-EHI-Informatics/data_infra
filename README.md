@@ -19,3 +19,16 @@ This is a self contained tutorial to set up the necessary data infrastructure on
 # Prerequisites
 
 You'll require a K8S cluster. This will be where your data infra will be deployed.
+
+# Image repository 
+
+We've chosen to store the docker container images on github container registry. You'll have to provide k8s with the login credentials
+
+```
+USERNAME=nea-ehi-informatics
+PASSWORD=<CREDENTIAL>  # with `package:write`, `package:read`
+kubectl create secret docker-registry ghcr-secret \
+  --docker-server=ghcr.io \
+  --docker-username=$USERNAME \
+  --docker-password=$PASSWORD
+```
