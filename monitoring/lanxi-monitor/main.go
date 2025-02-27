@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/sirupsen/logrus"
 )
 
 type config struct {
@@ -26,12 +26,7 @@ type config struct {
 	location  string
 }
 
-var logger = logrus.New()
-
-func init() {
-	logger.SetFormatter(&logrus.JSONFormatter{})
-	logger.SetLevel(logrus.InfoLevel)
-}
+var logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 func checkLanxiAlive(cfg *config) {
 	for {
@@ -42,19 +37,19 @@ func checkLanxiAlive(cfg *config) {
 
 		if err == nil {
 			lanxiUp.WithLabelValues(cfg.deviceID, cfg.location).Set(1)
-			logger.WithFields(logrus.Fields{
-				"status":  "up",
-				"module":  "LAN-XI",
-				"address": cfg.lanxiHost,
-			}).Info("LAN-XI module is reachable")
+			logger.Info("LAN-XI module is reachable",
+				"status", "up",
+				"module", "LAN-XI",
+				"address", cfg.lanxiHost,
+			)
 		} else {
 			lanxiUp.WithLabelValues(cfg.deviceID, cfg.location).Set(0)
-			logger.WithFields(logrus.Fields{
-				"status":  "down",
-				"module":  "LAN-XI",
-				"address": cfg.lanxiHost,
-				"error":   err.Error(),
-			}).Error("LAN-XI module is unreachable")
+			logger.Error("LAN-XI module is unreachable",
+				"status", "down",
+				"module", "LAN-XI",
+				"address", cfg.lanxiHost,
+				"error", err.Error(),
+			)
 		}
 		time.Sleep(5 * time.Second)
 	}
@@ -74,6 +69,14 @@ func main() {
 	flag.Parse()
 
 	RegisterMetrics()
+	client := NewLANXIClient(config.lanxiHost)
+	// Open the recorder application
+	ctx := context.Background()
+	if err := client.OpenRecorder(ctx); err != nil {
+		logger.Error("Failed to open recorder", "error", err)
+		os.Exit(1)
+	}
+
 	go checkLanxiAlive(config)
 
 	r := mux.NewRouter()
@@ -88,12 +91,12 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	logger.Infof("Starting server on :%d", config.httpPort)
+	logger.Info("Starting server", "port", config.httpPort)
 
 	// Handle graceful shutdown
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatalf("Server error: %v", err)
+			logger.Error("Server error", "error", err)
 		}
 	}()
 
@@ -105,7 +108,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		logger.Errorf("Server forced to shutdown: %v", err)
+		logger.Error("Server forced to shutdown", "error", err)
 	}
 	logger.Info("Server exited properly")
 }
