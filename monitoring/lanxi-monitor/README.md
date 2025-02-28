@@ -12,7 +12,33 @@ GOOS=linux GOARCH=arm64 go build -o bin/lanxi-monitor .
 
 # Installation
 
-Copy the generated binary `lanxi-monitor` to the following directory `/home/ubuntu/lanxi/bin`, on PI attached to the laxi module.
+The recommended way of running `lanxi-monitor` is as a `systemd` service. 
+
+This ensures that the service:  
+- **Starts automatically** when the Raspberry Pi boots up.  
+- **Restarts automatically** if it crashes or stops unexpectedly.  
+
+The `systemd` service file should be found at: `/etc/systemd/system/lanxi-monitor.service`
+
+1. Reload system daemon
+
+  ```bash
+  sudo systemctl daemon-reload
+  ```
+
+2. Start the service
+
+  ```bash
+  sudo systemctl start lanxi-monitor
+  ```
+
+3. Enable the service to start when the system boots up
+
+  ```bash
+  sudo systemctl enable lanxi-monitor
+  ```
+
+In the service definition, it points the binary `ExecStart=/home/ubuntu/lanxi/bin/lanxi-monitor`. Place the built binary `lanxi-monitor` in that directory `/home/ubuntu/lanxi/bin`.
 
 # Alloy (Metrics Scraper)
 
