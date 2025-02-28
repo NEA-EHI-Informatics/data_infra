@@ -3,11 +3,11 @@ Description=LANXI Monitor Service
 After=network.target
 
 [Service]
-ExecStart=/home/ubuntu/lanxi/bin/lanxi
+ExecStart=/home/ubuntu/lanxi/bin/lanxi-monitor
 WorkingDirectory=/home/ubuntu/lanxi
 Restart=always
-User=pi
-Group=pi
+User=ubuntu
+Group=ubuntu
 Environment="PORT=8080"
 LimitNOFILE=4096
 
