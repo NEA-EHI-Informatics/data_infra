@@ -78,6 +78,13 @@ func main() {
 	}
 
 	go checkLanxiAlive(config)
+	client := NewLANXIClient(config.lanxiHost)
+
+	ctx := context.Background()
+	if err := client.OpenRecorder(ctx); err != nil {
+		logger.Error("Failed to open recorder", "error", err)
+		os.Exit(1)
+	}
 
 	r := mux.NewRouter()
 	r.Handle("/metrics", promhttp.Handler())
