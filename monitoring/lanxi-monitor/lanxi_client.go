@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -21,7 +22,8 @@ type SignalBlock struct {
 }
 
 type LANXIClient struct {
-	host string
+	host   string
+	config *LanxiConfig
 }
 
 func NewLANXIClient(host string) *LANXIClient {
@@ -105,6 +107,47 @@ func (c *LANXIClient) GetTEDSInfo(ctx context.Context) ([]map[string]interface{}
 		return nil, err
 	}
 	return teds, nil
+}
+
+func (c *LANXIClient) CreateRecording(ctx context.Context) error {
+	url := fmt.Sprintf("http://%s/rest/rec/create", c.host)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
+}
+
+func (c *LANXIClient) ConfigureRecording(ctx context.Context) error {
+	url := fmt.Sprintf("http://%s/rest/rec/channels/input", c.host)
+	jsonData, err := json.Marshal(c.config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected response status: %s", resp.Status)
+	}
+
+	return nil
 }
 
 func (c *LANXIClient) StartStreaming(ctx context.Context) (int, error) {

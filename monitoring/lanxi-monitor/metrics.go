@@ -30,5 +30,9 @@ var (
 )
 
 func RegisterMetrics() {
-	prometheus.MustRegister(lanxiUp)
+	prometheus.MustRegister(
+		lanxiUp,
+		lanxiAmplitudeMin,
+		lanxiAmplitudeMax,
+	)
 }

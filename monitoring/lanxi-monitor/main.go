@@ -21,9 +21,11 @@ import (
 
 type config struct {
 	lanxiHost string
+	lanxiConfig string
 	httpPort  int
 	deviceID  string
 	location  string
+	tcpPort int
 }
 
 var logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -34,6 +36,7 @@ func main() {
 	flag.IntVar(&config.httpPort, "httpPort", 8080, "Port of the HTTP server")
 	flag.StringVar(&config.deviceID, "deviceID", "lanxi-01", "Device identifier")
 	flag.StringVar(&config.location, "location", "lab-1", "Device location")
+	flag.StringVar(&config.lanxiConfig, "lanxiConfig", "setup.json", "LAN-XI configuration file")
 	flag.Parse()
 
 	RegisterMetrics()
@@ -71,7 +74,6 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
-
 	go func() {
 		logger.Info("Opening recorder")
 		if err := client.OpenRecorder(ctx); err != nil {
@@ -85,6 +87,7 @@ func main() {
 			cancel()
 			return
 		}
+		LoadLanxiConfig(config.lanxiConfig)
 		logger.Info("Configuring recording")
 		if err := client.ConfigureRecording(ctx, setup); err != nil {
 			logger.Error("ConfigureRecording failed", "error", err)
@@ -97,10 +100,13 @@ func main() {
 			cancel()
 			return
 		}
+
 	}()
 
 	go checkLanxiAlive(config)
-
+	go processDataStream(config.lanxiHost, 4000, config)) {
+		
+	}()
 	<-quit
 	logger.Info("Shutting down server...")
 
@@ -211,7 +217,7 @@ func processDataStream(host string, port int, cfg *config) {
 		}
 
 		switch messageType {
-		case 1: // Interpretation message
+		case 8: // Interpretation message
 			// Parse interpretation data (simplified example)
 			signalID := int32(binary.LittleEndian.Uint32(content[0:4]))
 			descType := binary.LittleEndian.Uint32(content[4:8]))
@@ -221,7 +227,7 @@ func processDataStream(host string, port int, cfg *config) {
 				scaleFactors[signalID] = value
 			}
 
-		case 2: // Signal data
+		case 1: // Signal data
 			signalID := int32(binary.LittleEndian.Uint32(content[0:4]))
 			numSamples := int(binary.LittleEndian.Uint32(content[4:8]))
 			
@@ -268,4 +274,19 @@ func processDataStream(host string, port int, cfg *config) {
 			}
 		}
 	}
+}
+
+func LoadLanxiConfig(filename string) (*LanxiConfig, error) {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var config LanxiConfig
+	err = json.Unmarshal(data, &config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	return &config, nil
 }
