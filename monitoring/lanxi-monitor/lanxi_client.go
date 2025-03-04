@@ -33,6 +33,14 @@ var (
 	mu           sync.Mutex
 )
 
+func updateMaxAmplitude(newValue float64) {
+	mu.Lock()
+	defer mu.Unlock()
+	if newValue > maxAmplitude {
+		maxAmplitude = newValue
+	}
+}
+
 func (c *LANXIClient) OpenRecorder(ctx context.Context) error {
 	url := fmt.Sprintf("http://%s/rest/rec/open", c.host)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, nil)

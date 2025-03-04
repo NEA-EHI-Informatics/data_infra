@@ -37,21 +37,6 @@ func main() {
 	flag.Parse()
 
 	RegisterMetrics()
-	client := NewLANXIClient(config.lanxiHost)
-	ctx := context.Background()
-	if err := client.OpenRecorder(ctx); err != nil {
-		logger.Error("Failed to open recorder", "error", err)
-		os.Exit(1)
-	}
-
-	// Start streaming & tracking max amplitude
-	go func() {
-		if err := client.StartStreaming(ctx, config.deviceID, config.location); err != nil {
-			logger.Error("Error starting stream", "error", err)
-		}
-	}()
-
-	go checkLanxiAlive(config)
 
 	r := mux.NewRouter()
 	r.Handle("/metrics", promhttp.Handler())
@@ -64,38 +49,81 @@ func main() {
 		ReadTimeout:  15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
-
-	logger.Info("Starting server", "port", config.httpPort)
-
-	// Handle graceful shutdown
 	go func() {
+		logger.Info("Starting HTTP server", "port", config.httpPort, "interface", "0.0.0.0")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger.Error("Server error", "error", err)
+			os.Exit(1)
 		}
 	}()
 
+	// Start LAN-XI client
+	client := NewLANXIClient(config.lanxiHost)
+	ctx, cancel := context.WithTimeout(context.Background(), 
+		10*time.Second +    // OpenRecorder
+		5*time.Second +     // CreateRecording
+		10*time.Second +    // ConfigureRecording
+		5*time.Second,      // StartMeasurement	
+	)
+	defer cancel()
+
+	// 4. Signal handling AFTER server is running
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+
+	go func() {
+		logger.Info("Opening recorder")
+		if err := client.OpenRecorder(ctx); err != nil {
+			logger.Error("Failed to open recorder", "error", err)
+			cancel()
+			return
+		}
+		logger.Info("Creating recording")
+		if err := client.CreateRecording(ctx); err != nil {
+			logger.Error("CreateRecording failed", "error", err)
+			cancel()
+			return
+		}
+		logger.Info("Configuring recording")
+		if err := client.ConfigureRecording(ctx, setup); err != nil {
+			logger.Error("ConfigureRecording failed", "error", err)
+			cancel()
+			return
+		}
+		logger.Info("Starting measurement")
+		if err := client.StartMeasurement(ctx); err != nil {
+			logger.Error("StartMeasurement failed", "error", err)
+			cancel()
+			return
+		}
+	}()
+
+	go checkLanxiAlive(config)
+
 	<-quit
 	logger.Info("Shutting down server...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
 
-	// Stop measurement -> stop recording -> close recorder
+	logger.Info("Stopping measurement")
 	if err := client.StopMeasurement(ctx); err != nil {
 		logger.Error("Failed to stop measurement", "error", err)
 	}
+	logger.Info("Finishing Recording")
 	if err := client.FinishRecording(ctx); err != nil {
 		logger.Error("Failed to finish recording", "error", err)
 	}
+	logger.Info("Closing recorder")
 	if err := client.CloseRecorder(ctx); err != nil {
 		logger.Error("Failed to close recorder", "error", err)
 	}
-
+	logger.Info("Shutting down server")
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Error("Server forced to shutdown", "error", err)
 	}
+	shutdownCancel()
 	logger.Info("Server exited properly")
 }
 
