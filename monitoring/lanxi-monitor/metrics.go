@@ -11,6 +11,22 @@ var (
 		},
 		[]string{"device_id", "location"},
 	)
+	lanxiAmplitudeMin = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "lanxi",
+			Name:      "amplitude_min",
+			Help:      "Minimum amplitude per second.",
+		},
+		[]string{"device_id", "location", "channel"},
+	)
+	lanxiAmplitudeMax = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "lanxi",
+			Name:      "amplitude_max",
+			Help:      "Maximum amplitude per second.",
+		},
+		[]string{"device_id", "location", "channel"},
+	)
 )
 
 func RegisterMetrics() {
