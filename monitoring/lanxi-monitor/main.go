@@ -70,7 +70,7 @@ func main() {
 
 	RegisterMetrics()
 	client := NewLANXIClient(config.lanxiHost)
-	// Open the recorder application
+	// Open recorder
 	ctx := context.Background()
 	if err := client.OpenRecorder(ctx); err != nil {
 		logger.Error("Failed to open recorder", "error", err)
@@ -78,13 +78,6 @@ func main() {
 	}
 
 	go checkLanxiAlive(config)
-	client := NewLANXIClient(config.lanxiHost)
-
-	ctx := context.Background()
-	if err := client.OpenRecorder(ctx); err != nil {
-		logger.Error("Failed to open recorder", "error", err)
-		os.Exit(1)
-	}
 
 	r := mux.NewRouter()
 	r.Handle("/metrics", promhttp.Handler())
@@ -114,6 +107,15 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	// Stop measurement and close recorder
+	if err := client.StopMeasurement(ctx); err != nil {
+		logger.Error("Failed to stop measurement", "error", err)
+	}
+	if err := client.CloseRecorder(ctx); err != nil {
+		logger.Error("Failed to close recorder", "error", err)
+	}
+
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Error("Server forced to shutdown", "error", err)
 	}

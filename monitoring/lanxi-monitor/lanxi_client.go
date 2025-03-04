@@ -5,7 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 )
+
+type SignalData struct {
+	NumberOfSignals int32
+	Reserved        uint16
+	Signals         []SignalBlock
+}
+
+type SignalBlock struct {
+	SignalID       int32
+	NumberOfValues int32
+	Values         []int32
+}
 
 type LANXIClient struct {
 	host string
@@ -14,6 +27,11 @@ type LANXIClient struct {
 func NewLANXIClient(host string) *LANXIClient {
 	return &LANXIClient{host: host}
 }
+
+var (
+	maxAmplitude float64
+	mu           sync.Mutex
+)
 
 func (c *LANXIClient) OpenRecorder(ctx context.Context) error {
 	url := fmt.Sprintf("http://%s/rest/rec/open", c.host)
@@ -116,6 +134,20 @@ func (c *LANXIClient) StartMeasurement(ctx context.Context) error {
 
 func (c *LANXIClient) StopMeasurement(ctx context.Context) error {
 	url := fmt.Sprintf("http://%s/rest/rec/measurements/stop", c.host)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
+}
+
+func (c *LANXIClient) FinishRecording(ctx context.Context) error {
+	url := fmt.Sprintf("http://%s/rest/rec/finish", c.host)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, nil)
 	if err != nil {
 		return err
