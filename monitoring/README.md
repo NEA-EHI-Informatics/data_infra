@@ -1,7 +1,6 @@
 # Introduction
 
-![monitoring_diagram](https://github.com/user-attachments/assets/78abb27a-a6dc-4be0-ad35-b809a7602420)
-
+![monitoring drawio](https://github.com/user-attachments/assets/50eb8c20-e666-4468-8bcf-aa19eb026f38)
 
 In this folder, we store the necessary code for setting up a monitoring and alert system which comprises (1) **metrics scraper**, (2) **HTTP server** + **lanxi client** to interact with the HBK World sensor, (3) a **timeseries database** such as Prometheus or Mimir to store the telemetric data, (4) monitoring **dashboard** eg. Granfana and (5) an installable app on user's mobile device to alert of times when the readings are out of range. as part of the **Integrated Risk Management (IRM) client**
 
