@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"sync"
 )
 
@@ -27,7 +28,12 @@ type LANXIClient struct {
 }
 
 func NewLANXIClient(host string) *LANXIClient {
-	return &LANXIClient{host: host}
+	return &LANXIClient{
+		host: host,
+		client: &http.Client{
+			Timeout: 10 * time.Second,
+		}
+	}
 }
 
 var (
@@ -41,6 +47,21 @@ func updateMaxAmplitude(newValue float64) {
 	if newValue > maxAmplitude {
 		maxAmplitude = newValue
 	}
+}
+
+func LoadLanxiConfig(filename string) ([]byte, error) {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	// validation to ensure the JSON is well-formed
+	var jsonData map[string]interface{}
+	if err := json.Unmarshal(data, &jsonData); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	return data, nil
 }
 
 func (c *LANXIClient) OpenRecorder(ctx context.Context) error {
@@ -123,9 +144,9 @@ func (c *LANXIClient) CreateRecording(ctx context.Context) error {
 	return nil
 }
 
-func (c *LANXIClient) ConfigureRecording(ctx context.Context) error {
+func (c *LANXIClient) ConfigureRecording(ctx context.Context, cfg *config) error {
 	url := fmt.Sprintf("http://%s/rest/rec/channels/input", c.host)
-	jsonData, err := json.Marshal(c.config)
+	jsonData, err := LoadLanxiConfig(cfg.lanxiConfig)
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
@@ -136,15 +157,15 @@ func (c *LANXIClient) ConfigureRecording(ctx context.Context) error {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected response status: %s", resp.Status)
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unexpected response status: %d - %s", resp.Status, string(body))
 	}
 
 	return nil

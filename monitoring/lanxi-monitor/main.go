@@ -20,12 +20,12 @@ import (
 )
 
 type config struct {
-	lanxiHost string
+	lanxiHost   string
 	lanxiConfig string
-	httpPort  int
-	deviceID  string
-	location  string
-	tcpPort int
+	httpPort    int
+	deviceID    string
+	location    string
+	tcpPort     int
 }
 
 var logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -62,15 +62,14 @@ func main() {
 
 	// Start LAN-XI client
 	client := NewLANXIClient(config.lanxiHost)
-	ctx, cancel := context.WithTimeout(context.Background(), 
-		10*time.Second +    // OpenRecorder
-		5*time.Second +     // CreateRecording
-		10*time.Second +    // ConfigureRecording
-		5*time.Second,      // StartMeasurement	
+	ctx, cancel := context.WithTimeout(context.Background(),
+		10*time.Second+ // OpenRecorder
+			5*time.Second+ // CreateRecording
+			10*time.Second+ // ConfigureRecording
+			5*time.Second, // StartMeasurement
 	)
 	defer cancel()
 
-	// 4. Signal handling AFTER server is running
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
@@ -87,9 +86,8 @@ func main() {
 			cancel()
 			return
 		}
-		LoadLanxiConfig(config.lanxiConfig)
 		logger.Info("Configuring recording")
-		if err := client.ConfigureRecording(ctx, setup); err != nil {
+		if err := client.ConfigureRecording(ctx); err != nil {
 			logger.Error("ConfigureRecording failed", "error", err)
 			cancel()
 			return
@@ -104,9 +102,8 @@ func main() {
 	}()
 
 	go checkLanxiAlive(config)
-	go processDataStream(config.lanxiHost, 4000, config)) {
-		
-	}()
+	// go processDataStream(config)
+
 	<-quit
 	logger.Info("Shutting down server...")
 
@@ -182,111 +179,5 @@ func computeMinMax(samples []float64) (float64, float64) {
 }
 
 // Add this new function to process the data stream
-func processDataStream(host string, port int, cfg *config) {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
-	if err != nil {
-		logger.Error("Failed to connect to data stream", "error", err)
-		return
-	}
-	defer conn.Close()
-
-	var (
-		scaleFactors  = make(map[int32]float64)
-		sampleBuffers = make(map[int32][]float64)
-	)
-
-	for {
-		// Read header (28 bytes)
-		header := make([]byte, 28)
-		if _, err := io.ReadFull(conn, header); err != nil {
-			logger.Error("Failed to read header", "error", err)
-			return
-		}
-
-		// Parse header fields (little-endian)
-		messageType := binary.LittleEndian.Uint32(header[8:12])
-		contentLength := binary.LittleEndian.Uint32(header[12:16])
-
-		// Read content
-		content := make([]byte, contentLength)
-		if _, err := io.ReadFull(conn, content); err != nil {
-			logger.Error("Failed to read content", "error", err)
-			return
-		}
-
-		switch messageType {
-		case 8: // Interpretation message
-			// Parse interpretation data (simplified example)
-			signalID := int32(binary.LittleEndian.Uint32(content[0:4]))
-			descType := binary.LittleEndian.Uint32(content[4:8]))
-			value := math.Float64frombits(binary.LittleEndian.Uint64(content[8:16]))
-			
-			if descType == 3 { // Scale factor descriptor type
-				scaleFactors[signalID] = value
-			}
-
-		case 1: // Signal data
-			signalID := int32(binary.LittleEndian.Uint32(content[0:4]))
-			numSamples := int(binary.LittleEndian.Uint32(content[4:8]))
-			
-			scaleFactor, ok := scaleFactors[signalID]
-			if !ok {
-				continue
-			}
-
-			// Parse samples (24-bit little-endian)
-			samples := make([]float64, numSamples)
-			for i := 0; i < numSamples; i++ {
-				offset := 8 + i*3
-				sample := int32(content[offset]) | int32(content[offset+1])<<8 | int32(content[offset+2])<<16
-				// Sign extend if needed
-				if (sample & 0x00800000) > 0 {
-					sample |= ^0x00ffffff
-				}
-				samples[i] = float64(sample) * scaleFactor / (1 << 23)
-			}
-
-			// Update buffer
-			sampleBuffers[signalID] = append(sampleBuffers[signalID], samples...)
-
-			// Process if we have >=51000 samples
-			if len(sampleBuffers[signalID]) >= 51000 {
-				window := sampleBuffers[signalID][:51000]
-				min, max := computeMinMax(window)
-				
-				// Update metrics
-				lanxiAmplitudeMin.WithLabelValues(
-					cfg.deviceID,
-					cfg.location,
-					strconv.Itoa(int(signalID)),
-				).Set(min)
-				
-				lanxiAmplitudeMax.WithLabelValues(
-					cfg.deviceID,
-					cfg.location,
-					strconv.Itoa(int(signalID)),
-				).Set(max)
-
-				// Keep remaining samples
-				sampleBuffers[signalID] = sampleBuffers[signalID][51000:]
-			}
-		}
-	}
-}
-
-func LoadLanxiConfig(filename string) (*LanxiConfig, error) {
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read config file: %w", err)
-	}
-
-	var config LanxiConfig
-	err = json.Unmarshal(data, &config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
-	}
-
-	return &config, nil
+func processDataStream(cfg *config) {
 }

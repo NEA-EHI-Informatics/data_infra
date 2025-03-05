@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 )
 
 // Struct to match the JSON structure
@@ -57,13 +57,13 @@ type Type struct {
 }
 
 // Function to load config from file
-func LoadConfig(filename string) (*Config, error) {
-	data, err := ioutil.ReadFile(filename)
+func LoadConfig(filename string) (*LanxiConfig, error) {
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	var config Config
+	var config LanxiConfig
 	err = json.Unmarshal(data, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
