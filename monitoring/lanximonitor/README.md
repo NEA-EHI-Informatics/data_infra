@@ -1,15 +1,6 @@
-<!-- vscode-markdown-toc -->
-* 1. [Configuration](#Configuration)
-
-<!-- vscode-markdown-toc-config
-	numbering=true
-	autoSave=true
-	/vscode-markdown-toc-config -->
-<!-- /vscode-markdown-toc -->
-
 # Introduction
 
-`lanxi` is a lightweight http server targeted to be run on Raspberry PI. it has two endpoints `/metrics` and `/health`. The former exposes metrics for grafana alloy to scrape to push to prometheus.
+`lanximonitor` is a lightweight http server targeted to be run on Raspberry PI. it has two endpoints `/metrics` and `/health`. The former exposes metrics for grafana alloy to scrape to push to prometheus.
 
 
 
@@ -18,7 +9,7 @@
 To build the binary, run `go build`
 
 ```bash
-GOOS=linux GOARCH=arm64 go build -o bin/lanxi-monitor .
+GOOS=linux GOARCH=arm64 go build -o bin/lanximonitor .
 ```
 
 # Installation
@@ -42,4 +33,8 @@ Copy the generated binary `lanxi-monitor` to the following directory `/home/ubun
           Device location (default "lab-1")
   ```
 
-##  1. <a name='Configuration'></a>Configuration 
+## Configuration 
+
+1. Get the default by running `GET` against `http://<URL>/rest/rec/channels/input/all/transducers`. See example config: [setup.json](./setup.json)
+
+You'll need to get the `serialNumber` of the **attached** tranducers and edit the default values. 
