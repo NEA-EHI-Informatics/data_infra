@@ -1,7 +1,7 @@
 package openapi
 
 // This is a generated file! Please edit source .ksy file and use kaitai-struct-compiler to rebuild
-// took from https://github.com/hbk-world/open-api-tutorials/blob/master/src/kaitai/go/src/openapi_message.go
+
 import (
 	"bytes"
 
@@ -658,11 +658,28 @@ func (this *OpenapiMessage_Value) Read(io *kaitai.Stream, parent *OpenapiMessage
 	this.Value3 = tmp54
 	return err
 }
+
+// original generated calcvalue
+// func (this *OpenapiMessage_Value) CalcValue() (v int, err error) {
+// 	if this._f_calcValue {
+// 		return this.calcValue, nil
+// 	}
+// 	this.calcValue = int(((this.Value1 + (this.Value2 << 8)) + (this.Value3 << 16)))
+// 	this._f_calcValue = true
+// 	return this.calcValue, nil
+// }
+
 func (this *OpenapiMessage_Value) CalcValue() (v int, err error) {
 	if this._f_calcValue {
 		return this.calcValue, nil
 	}
-	this.calcValue = int(((this.Value1 + (this.Value2 << 8)) + (this.Value3 << 16)))
+
+	this.calcValue = int(
+		int32(this.Value1) + // value1 (u1 -> uint32)
+			(int32(this.Value2) << 8) + // value2 (u1 -> uint32, shifted left by 8 bits)
+			(int32(this.Value3) << 16), // value3 (s1 -> int32, shifted left by 16 bits)
+	)
+
 	this._f_calcValue = true
 	return this.calcValue, nil
 }
