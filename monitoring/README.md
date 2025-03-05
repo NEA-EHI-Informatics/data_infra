@@ -22,6 +22,48 @@ The `lanxiclient` starts a recording by sending a series of API calls to initiat
 <!-- /vscode-markdown-toc -->
 
 
+# Networking
+
+We set the hostname for the pi to follow the convention `ehi-<BRANCH>-<sensor_type>-<location><id>`
+
+```bash
+sudo hostnamectl set-hostname ehi-beb-accelpi-lab01
+````
+
+Because the sensor is connected to the PI via LAN, we would like the IP to the LANXI module to be fixed. The LANXI module defaults to 169.
+
+1. Get lanxi MAC address
+
+  * Run `arp` and get mac address of the attached LANXI module:
+
+    ```bash
+    $ arp -a
+
+    _gateway (<IP>) at <MAC_ADDRESS> [ether] on wlan0
+    ? (<IP>) at <MAC_ADDRESS> [ether] on wlan0
+    ? (169.254.61.199) at <MAC_ADDRESS> [ether] on eth0 <- this one
+    ```
+
+2. Set IPs 
+
+  * Install `dnsmasq`
+
+    ```bash
+    sudo apt update && sudo apt install dnsmasq -y
+    ```
+
+  * Edit config `/etc/dnsmasq.conf` 
+
+    PI's `eth0` device will be assigned IPs in this range (`169.254.61.1` - `169.254.61.254`). Setting port=0 will disable DNS function, 
+    we dont need it.
+
+    ```
+    port=0
+    interface=eth0
+    dhcp-range=169.254.61.1,169.254.61.254,255.255.0.0,infinite
+    dhcp-host=<MAC_ADDRESS>,<DESIRED_IP>,infinite
+    ```
+
 # Alloy (Metrics Scraper)
 
 For metrics to be pushed to grafana, a metrics scraper, in this case [Granfana Alloy](https://grafana.com/docs/alloy/latest/), is required. Alloy is a lightweight scraper on baremetal machine where `lanximonitor` is running. Alloy scrapes `/metrics` and pushes telemetry data to a timeseries database (eg. Grafana Mimir or Prometheus). See [config](./alloy/config.alloy) for more information.
@@ -64,7 +106,8 @@ sudo systemctl enable lanxi-monitor
 1. Set up service unit 
 
     ```bash
-    # download this from the github release page
+    # download .deb from the github release page
+    curl -OL https://github.com/grafana/alloy/releases/download/v1.6.1/alloy-1.6.1-1.arm64.deb
     sudo dpkg -i alloy-1.6.1-1.arm64.deb
     ```
 
@@ -75,6 +118,7 @@ sudo systemctl enable lanxi-monitor
     * See example of config:
 
       ```river
+      // default scrape interval is 1 minute
       prometheus.scrape "lanxi_monitor" {
       targets = [
           {
