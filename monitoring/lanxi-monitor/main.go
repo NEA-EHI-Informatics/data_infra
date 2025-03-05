@@ -1,5 +1,3 @@
-// Package main implements a monitoring service for LAN-XI accelerometer modules
-// exposing metrics LANXI module's health, amplitude min and max to Prometheus.
 package main
 
 import (
@@ -7,15 +5,20 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"lanxi-monitor/openapi"
 	"log/slog"
+	"math"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/kaitai-io/kaitai_struct_go_runtime/kaitai"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -87,7 +90,7 @@ func main() {
 			return
 		}
 		logger.Info("Configuring recording")
-		if err := client.ConfigureRecording(ctx); err != nil {
+		if err := client.ConfigureRecording(ctx, config); err != nil {
 			logger.Error("ConfigureRecording failed", "error", err)
 			cancel()
 			return
@@ -111,19 +114,19 @@ func main() {
 	defer shutdownCancel()
 
 	logger.Info("Stopping measurement")
-	if err := client.StopMeasurement(ctx); err != nil {
+	if err := client.StopMeasurement(shutdownCtx); err != nil {
 		logger.Error("Failed to stop measurement", "error", err)
 	}
 	logger.Info("Finishing Recording")
-	if err := client.FinishRecording(ctx); err != nil {
+	if err := client.FinishRecording(shutdownCtx); err != nil {
 		logger.Error("Failed to finish recording", "error", err)
 	}
 	logger.Info("Closing recorder")
-	if err := client.CloseRecorder(ctx); err != nil {
+	if err := client.CloseRecorder(shutdownCtx); err != nil {
 		logger.Error("Failed to close recorder", "error", err)
 	}
 	logger.Info("Shutting down server")
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Server forced to shutdown", "error", err)
 	}
 	shutdownCancel()
@@ -178,6 +181,136 @@ func computeMinMax(samples []float64) (float64, float64) {
 	return min, max
 }
 
+type SignalID uint16
+
 // Add this new function to process the data stream
-func processDataStream(cfg *config) {
+func processDataStream(cfg *config, port int) {
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", cfg.lanxiHost, port))
+	if err != nil {
+		logger.Error("Failed to connect to streaming port", "error", err)
+		return
+	}
+	defer conn.Close()
+
+	scaleFactors := make(map[SignalID]float64)
+	var scaleMutex sync.RWMutex
+
+	type channelStats struct {
+		min, max float64
+		count    int
+	}
+	stats := make(map[SignalID]*channelStats)
+	var statsMutex sync.Mutex
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	// Metrics updater
+	go func() {
+		for range ticker.C {
+			statsMutex.Lock()
+			for signalID, stat := range stats {
+				if stat.count == 0 {
+					continue
+				}
+
+				scaleMutex.RLock()
+				scaleFactor, ok := scaleFactors[signalID]
+				scaleMutex.RUnlock()
+
+				if ok {
+					lanxiAmplitudeMin.WithLabelValues(
+						cfg.deviceID,
+						cfg.location,
+						fmt.Sprintf("%d", signalID),
+					).Set(stat.min * scaleFactor)
+
+					lanxiAmplitudeMax.WithLabelValues(
+						cfg.deviceID,
+						cfg.location,
+						fmt.Sprintf("%d", signalID),
+					).Set(stat.max * scaleFactor)
+				}
+
+				// Reset stats
+				stat.min = math.MaxFloat64
+				stat.max = -math.MaxFloat64
+				stat.count = 0
+			}
+			statsMutex.Unlock()
+		}
+	}()
+
+	for {
+		// Read message using Kaitai parser
+		msg := openapi.NewOpenapiMessage()
+		err = msg.Read(kaitai.NewStream(conn), nil, nil)
+		if err != nil {
+			if err == io.EOF {
+				logger.Info("Stream connection closed")
+				return
+			}
+			logger.Error("Failed to parse message", "error", err)
+			continue
+		}
+
+		switch msg.Header.MessageType {
+		case openapi.OpenapiMessage_Header_EMessageType__ESignalData:
+			signalData := msg.Message.(*openapi.OpenapiMessage_SignalData)
+			for _, signal := range signalData.Signals {
+				signalID := SignalID(uint16(signal.SignalId))
+				scaleMutex.RLock()
+				scaleFactor, ok := scaleFactors[signalID]
+				scaleMutex.RUnlock()
+
+				if !ok {
+					continue
+				}
+
+				statsMutex.Lock()
+				stat, exists := stats[signalID]
+				if !exists {
+					stat = &channelStats{
+						min: math.MaxFloat64,
+						max: -math.MaxFloat64,
+					}
+					stats[signalID] = stat
+				}
+				statsMutex.Unlock()
+
+				for _, value := range signal.Values {
+					calcValue, _ := value.CalcValue()
+					scaledValue := float64(calcValue) * scaleFactor
+
+					if scaledValue < stat.min {
+						stat.min = scaledValue
+					}
+					if scaledValue > stat.max {
+						stat.max = scaledValue
+					}
+					stat.count++
+				}
+			}
+
+		case openapi.OpenapiMessage_Header_EMessageType__EInterpretation:
+			interpretations := msg.Message.(*openapi.OpenapiMessage_Interpretations)
+			for _, interpretation := range interpretations.Interpretations {
+				if interpretation.DescriptorType == openapi.OpenapiMessage_Interpretation_EDescriptorType__ScaleFactor {
+					signalID := SignalID(interpretation.SignalId)
+					scaleMutex.Lock()
+					scaleFactors[signalID] = interpretation.Value.(float64)
+					scaleMutex.Unlock()
+				}
+			}
+
+		case openapi.OpenapiMessage_Header_EMessageType__EDataQuality:
+			// Handle data quality messages if needed
+			dataQuality := msg.Message.(*openapi.OpenapiMessage_DataQuality)
+			for _, quality := range dataQuality.Qualities {
+				if overload, _ := quality.ValidityFlags.Overload(); overload {
+					logger.Warn("Signal overload detected", "signal_id", quality.SignalId)
+				}
+			}
+		}
+	}
 }

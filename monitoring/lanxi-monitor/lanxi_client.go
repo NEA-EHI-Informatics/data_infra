@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"sync"
+	"time"
 )
 
 type SignalData struct {
@@ -24,7 +26,7 @@ type SignalBlock struct {
 
 type LANXIClient struct {
 	host   string
-	config *LanxiConfig
+	client *http.Client
 }
 
 func NewLANXIClient(host string) *LANXIClient {
@@ -32,7 +34,7 @@ func NewLANXIClient(host string) *LANXIClient {
 		host: host,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
-		}
+		},
 	}
 }
 
