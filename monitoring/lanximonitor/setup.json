@@ -1,0 +1,160 @@
+{
+    "channels": [
+        {
+            "ConnectorSelect": "BNC",
+            "bandwidth": "51.2 kHz",
+            "bridgeCompletion": "None",
+            "bridgeExcCurrent": 0.0,
+            "bridgeExcOn": false,
+            "bridgeExcVoltage": 0.0,
+            "bridgeQuarterCompletionImpedance": "Off",
+            "bridgeRemoteSenseWiring": "None",
+            "bridgeShunt": false,
+            "bridgeSingleEnd": false,
+            "bridgeSupplyType": "DC Voltage",
+            "ccld": false,
+            "channel": 1,
+            "destinations": [
+                "socket"
+            ],
+            "enabled": true,
+            "filter": "7.0 Hz",
+            "floating": false,
+            "hats": false,
+            "name": "Channel 1",
+            "polvolt": false,
+            "range": "10 Vpeak",
+            "transducer": {
+                "requires200V": false,
+                "requiresCcld": true,
+                "sensitivity": 1,
+                "serialNumber": 31700,
+                "type": {
+                    "model": "",
+                    "number": "None",
+                    "prefix": "",
+                    "variant": ""
+                },
+                "unit": "V"
+            }
+        },
+        {
+            "ConnectorSelect": "BNC",
+            "bandwidth": "51.2 kHz",
+            "bridgeCompletion": "None",
+            "bridgeExcCurrent": 0.0,
+            "bridgeExcOn": false,
+            "bridgeExcVoltage": 0.0,
+            "bridgeQuarterCompletionImpedance": "Off",
+            "bridgeRemoteSenseWiring": "None",
+            "bridgeShunt": false,
+            "bridgeSingleEnd": false,
+            "bridgeSupplyType": "DC Voltage",
+            "ccld": false,
+            "channel": 2,
+            "destinations": [
+                "socket"
+            ],
+            "enabled": false,
+            "filter": "7.0 Hz",
+            "floating": false,
+            "hats": false,
+            "name": "Channel 2",
+            "polvolt": false,
+            "range": "10 Vpeak",
+            "transducer": {
+                "requires200V": false,
+                "requiresCcld": true,
+                "sensitivity": 1,
+                "serialNumber": 31700,
+                "type": {
+                    "model": "",
+                    "number": "None",
+                    "prefix": "",
+                    "variant": ""
+                },
+                "unit": "V"
+            }
+        },
+        {
+            "ConnectorSelect": "BNC",
+            "bandwidth": "51.2 kHz",
+            "bridgeCompletion": "None",
+            "bridgeExcCurrent": 0.0,
+            "bridgeExcOn": false,
+            "bridgeExcVoltage": 0.0,
+            "bridgeQuarterCompletionImpedance": "Off",
+            "bridgeRemoteSenseWiring": "None",
+            "bridgeShunt": false,
+            "bridgeSingleEnd": false,
+            "bridgeSupplyType": "DC Voltage",
+            "ccld": false,
+            "channel": 3,
+            "destinations": [
+                "sd"
+            ],
+            "enabled": false,
+            "filter": "7.0 Hz",
+            "floating": false,
+            "hats": false,
+            "name": "Channel 3",
+            "polvolt": false,
+            "range": "10 Vpeak",
+            "transducer": {
+                "requires200V": false,
+                "requiresCcld": false,
+                "sensitivity": 1,
+                "serialNumber": 0,
+                "type": {
+                    "model": "",
+                    "number": "None",
+                    "prefix": "",
+                    "variant": ""
+                },
+                "unit": "V"
+            }
+        },
+        {
+            "ConnectorSelect": "BNC",
+            "bandwidth": "51.2 kHz",
+            "bridgeCompletion": "None",
+            "bridgeExcCurrent": 0.0,
+            "bridgeExcOn": false,
+            "bridgeExcVoltage": 0.0,
+            "bridgeQuarterCompletionImpedance": "Off",
+            "bridgeRemoteSenseWiring": "None",
+            "bridgeShunt": false,
+            "bridgeSingleEnd": false,
+            "bridgeSupplyType": "DC Voltage",
+            "ccld": false,
+            "channel": 4,
+            "destinations": [
+                "sd"
+            ],
+            "enabled": false,
+            "filter": "7.0 Hz",
+            "floating": false,
+            "hats": false,
+            "name": "Channel 4",
+            "polvolt": false,
+            "range": "10 Vpeak",
+            "transducer": {
+                "requires200V": false,
+                "requiresCcld": false,
+                "sensitivity": 1,
+                "serialNumber": 0,
+                "type": {
+                    "model": "",
+                    "number": "None",
+                    "prefix": "",
+                    "variant": ""
+                },
+                "unit": "V"
+            }
+        }
+    ],
+    "fileFormat": "wav",
+    "maxSize": 2147483647,
+    "name": "Default setup",
+    "recordingMode": "Single"
+}

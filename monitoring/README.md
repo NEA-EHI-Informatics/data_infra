@@ -135,3 +135,20 @@ sudo systemctl enable lanxi-monitor
       ```bash
       sudo systemclt daemon-reload
       ```
+
+# Usage 
+
+  ```bash
+  ./lanximonitor --help
+  Usage of ./lanxi-monitor-0.0.2:
+    -deviceID string
+          Device identifier (default "lanxi-01")
+    -httpPort int
+          Port of the HTTP server (default 8080)
+    -lanxiConfig string
+          LAN-XI configuration file (default "setup.json")
+    -lanxiHost string
+          IP of the LAN-XI module (default "169.254.61.199")
+    -location string
+          Device location (default "lab-1")
+  ```
