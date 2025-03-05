@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -181,6 +182,51 @@ func computeMinMax(samples []float64) (float64, float64) {
 	return min, max
 }
 
+type bufferedReadSeeker struct {
+	r   io.Reader
+	buf *bytes.Buffer
+}
+
+func newBufferedReadSeeker(r io.Reader) *bufferedReadSeeker {
+	return &bufferedReadSeeker{
+		r:   r,
+		buf: bytes.NewBuffer(nil),
+	}
+}
+
+func (b *bufferedReadSeeker) Read(p []byte) (n int, err error) {
+	// First try to read from the buffer
+	if b.buf.Len() > 0 {
+		return b.buf.Read(p)
+	}
+
+	// If buffer is empty, read from the source
+	return b.r.Read(p)
+}
+
+func (b *bufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
+	// Only support seeking from current position (relative seeks)
+	if whence != io.SeekCurrent {
+		return 0, fmt.Errorf("only SeekCurrent is supported")
+	}
+
+	// If seeking forward, discard bytes
+	if offset > 0 {
+		_, err := io.CopyN(io.Discard, b, offset)
+		return offset, err
+	}
+
+	// If seeking backward, we need to have buffered enough data
+	if b.buf.Len() < int(-offset) {
+		return 0, fmt.Errorf("cannot seek back beyond buffered data")
+	}
+
+	// Move the read position back
+	newBuf := bytes.NewBuffer(b.buf.Bytes()[:b.buf.Len()+int(offset)])
+	b.buf = newBuf
+	return offset, nil
+}
+
 type SignalID uint16
 
 // Add this new function to process the data stream
@@ -191,7 +237,7 @@ func processDataStream(cfg *config, port int) {
 		return
 	}
 	defer conn.Close()
-
+	brs := newBufferedReadSeeker(conn)
 	scaleFactors := make(map[SignalID]float64)
 	var scaleMutex sync.RWMutex
 
@@ -244,7 +290,7 @@ func processDataStream(cfg *config, port int) {
 	for {
 		// Read message using Kaitai parser
 		msg := openapi.NewOpenapiMessage()
-		err = msg.Read(kaitai.NewStream(conn), nil, nil)
+		err = msg.Read(kaitai.NewStream(brs), nil, nil)
 		if err != nil {
 			if err == io.EOF {
 				logger.Info("Stream connection closed")
