@@ -97,7 +97,6 @@ func main() {
 			cancel()
 			return
 		}
-		// start streaming
 		logger.Info("Starting data stream")
 		if err := client.StartStreaming(ctx); err != nil {
 			logger.Error("ConfigureRecording failed", "error", err)
@@ -112,7 +111,7 @@ func main() {
 			return
 		}
 		logger.Info("Reading data stream")
-		if err := client.ProcessDataStream(config); err != nil {
+		if err := client.ProcessDataStream(ctx, config); err != nil {
 			logger.Error("Reading data stewam failed", "error", err)
 			cancel()
 			return

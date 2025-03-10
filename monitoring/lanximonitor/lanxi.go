@@ -49,14 +49,6 @@ var (
 	mu           sync.Mutex
 )
 
-func updateMaxAmplitude(newValue float64) {
-	mu.Lock()
-	defer mu.Unlock()
-	if newValue > maxAmplitude {
-		maxAmplitude = newValue
-	}
-}
-
 func LoadLanxiConfig(filename string) ([]byte, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -360,8 +352,8 @@ func (b *bufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
 type SignalID uint16
 
 // Add this new function to process the data stream
-func (c *LANXIClient) ProcessDataStream(cfg *config) error {
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", cfg.lanxiHost, c.port))
+func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error {
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.host, c.port))
 	if err != nil {
 		logger.Error("Failed to connect to streaming port", "error", err)
 		return err
