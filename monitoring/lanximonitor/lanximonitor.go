@@ -80,7 +80,11 @@ func main() {
 		}
 		logger.Info("Readiness Check")
 		// TODO(Wesley): Implement readiness check
-
+		if err := client.WaitForTransducerDetection(ctx); err != nil {
+			logger.Error("Failed to detect transducers", "error", err)
+			cancel()
+			return
+		}
 		logger.Info("Creating recording")
 		if err := client.CreateRecording(ctx); err != nil {
 			logger.Error("CreateRecording failed", "error", err)

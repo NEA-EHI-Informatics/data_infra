@@ -152,6 +152,46 @@ func (c *LANXIClient) CreateRecording(ctx context.Context) error {
 	return nil
 }
 
+func (c *LANXIClient) WaitForTransducerDetection(ctx context.Context) error {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			// Make the HTTP request
+			url := fmt.Sprintf("http://%s/rest/rec/onchange", c.host)
+			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+			if err != nil {
+				return err
+			}
+
+			resp, err := c.client.Do(req)
+			if err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				continue // Retry on transient errors
+			}
+
+			var result struct {
+				Active bool `json:"transducerDetectionActive"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+				resp.Body.Close()
+				continue // Retry on parse errors
+			}
+			resp.Body.Close()
+
+			if !result.Active {
+				return nil
+			}
+		}
+	}
+}
+
 func (c *LANXIClient) ConfigureRecording(ctx context.Context, cfg *config) error {
 	url := fmt.Sprintf("http://%s/rest/rec/channels/input", c.host)
 	jsonData, err := LoadLanxiConfig(cfg.lanxiConfig)
