@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"lanxi-monitor/openapi"
@@ -11,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -414,9 +416,17 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 		msg := openapi.NewOpenapiMessage()
 		err = msg.Read(kaitai.NewStream(brs), nil, nil)
 		if err != nil {
-			if err == io.EOF {
-				logger.Info("Stream connection closed")
-				return err
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				logger.Info("Stream connection closed, reconnecting...")
+				conn.Close()
+				conn, err = net.Dial("tcp", fmt.Sprintf("%s:%d", cfg.lanxiHost, c.port))
+				// TODO(wesley): add reconnection logic with backoff
+				continue
+			} else if strings.Contains(err.Error(), "exceeds maximum allowed") {
+				logger.Error("Invalid message size, resetting connection")
+				conn.Close()
+				// Reconnect logic
+				continue
 			}
 			logger.Error("Failed to parse message", "error", err)
 			continue
