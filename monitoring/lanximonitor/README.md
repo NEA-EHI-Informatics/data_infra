@@ -38,3 +38,7 @@ Copy the generated binary `lanxi-monitor` to the following directory `/home/ubun
 1. Get the default by running `GET` against `http://<URL>/rest/rec/channels/input/all/transducers`. See example config: [setup.json](./setup.json)
 
 You'll need to get the `serialNumber` of the **attached** tranducers and edit the default values. 
+
+# References
+
+For more information regarding the LAN-XI module's REST API please refer to this [PDF guide](https://www.bksv.com/-/media/literature/Manuals/be1872.ashx)
