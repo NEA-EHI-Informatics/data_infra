@@ -33,7 +33,7 @@ func main() {
 	flag.IntVar(&config.httpPort, "httpPort", 8080, "Port of the HTTP server")
 	flag.StringVar(&config.deviceID, "deviceID", "lanxi-01", "Device identifier")
 	flag.StringVar(&config.location, "location", "lab-1", "Device location")
-	flag.StringVar(&config.lanxiConfig, "lanxiConfig", "setup.json", "LAN-XI configuration file")
+	flag.StringVar(&config.lanxiConfig, "lanxiConfig", "/home/ubuntu/lanxi/setup.json", "LAN-XI configuration file")
 	flag.Parse()
 
 	RegisterMetrics()

@@ -93,6 +93,18 @@ LimitNOFILE=4096
 WantedBy=multi-user.target
 ```
 
+You can keep multiple versions of the lanxi-monitor in `./bin` 
+
+```bash
+ls -alh /home/ubuntu/lanxi/bin
+
+total 13M
+drwxrwxr-x 2 ubuntu ubuntu 4.0K Mar 10 14:24 .
+drwxrwxr-x 3 ubuntu ubuntu 4.0K Feb 26 13:28 ..
+lrwxrwxrwx 1 ubuntu ubuntu   42 Mar 10 14:24 lanximonitor -> /home/ubuntu/lanxi/bin/lanxi-monitor-0.0.2
+-rwxrwxr-x 1 ubuntu ubuntu  13M Mar 10 14:16 lanxi-monitor-0.0.2
+```
+
 ###  1.1. <a name='StartandEnablelanxi-monitor'></a>Start and Enable lanxi-monitor
 
 ```bash
