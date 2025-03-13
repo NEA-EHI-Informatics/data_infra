@@ -674,6 +674,7 @@ func (this *OpenapiMessage_Value) CalcValue() (v int, err error) {
 		return this.calcValue, nil
 	}
 
+
 	raw := (uint32(this.Value3) << 16) |
 		(uint32(this.Value2) << 8) |
 		uint32(this.Value1)
