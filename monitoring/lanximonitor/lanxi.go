@@ -80,6 +80,41 @@ func (c *LANXIClient) OpenRecorder(ctx context.Context) error {
 	return nil
 }
 
+func (c *LANXIClient) GetModuleState(ctx context.Context) (string, error) {
+	url := fmt.Sprintf("http://%s/rest/rec/module/info", c.host)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("request failed with status code: %d", resp.StatusCode)
+	}
+
+	var info map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return "", err
+	}
+
+	moduleState, exists := info["moduleState"]
+	if !exists {
+		return "", fmt.Errorf("moduleState field not found in response")
+	}
+
+	// Type assertion to ensure it's a string
+	moduleStateStr, ok := moduleState.(string)
+	if !ok {
+		return "", fmt.Errorf("moduleState is not a string (got type %T)", moduleState)
+	}
+
+	return moduleStateStr, nil
+}
+
 func (c *LANXIClient) GetModuleInfo(ctx context.Context) (map[string]interface{}, error) {
 	url := fmt.Sprintf("http://%s/rest/rec/module/info", c.host)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -248,6 +283,20 @@ func (c *LANXIClient) StartMeasurement(ctx context.Context) error {
 	return nil
 }
 
+func (c *LANXIClient) Reboot(ctx context.Context) error {
+	url := fmt.Sprintf("http://%s/rest/rec/reboot", c.host)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
+}
+
 func (c *LANXIClient) StopMeasurement(ctx context.Context) error {
 	url := fmt.Sprintf("http://%s/rest/rec/measurements/stop", c.host)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, nil)
@@ -361,7 +410,7 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 		return err
 	}
 	defer conn.Close()
-	brs := newBufferedReadSeeker(conn)
+	brs := NewSafeStream(conn)
 	scaleFactors := make(map[SignalID]float64)
 	var scaleMutex sync.RWMutex
 

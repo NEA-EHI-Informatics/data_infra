@@ -674,16 +674,12 @@ func (this *OpenapiMessage_Value) CalcValue() (v int, err error) {
 		return this.calcValue, nil
 	}
 
-	// Cast components to proper signed types first
-	v1 := int32(this.Value1)       // u1 → uint8 → int32
-	v2 := int32(this.Value2) << 8  // u1 → uint8 → int32
-	v3 := int32(this.Value3) << 16 // s1 → int8 → int32
-
-	combined := v1 + v2 + v3
-	if combined > 0x007FFFFF { // If exceeds positive 24-bit max
-		combined -= 0x01000000 // Adjust for 2's complement
+	raw := (uint32(this.Value3) << 16) |
+		(uint32(this.Value2) << 8) |
+		uint32(this.Value1)
+	if (raw & 0x00800000) != 0 {
+		raw |= 0xFF000000
 	}
-	this.calcValue = int(combined)
-	this._f_calcValue = true
-	return this.calcValue, nil
+
+	return int(int32(raw)), nil
 }

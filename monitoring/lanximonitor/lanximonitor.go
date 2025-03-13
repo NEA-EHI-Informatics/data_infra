@@ -60,7 +60,8 @@ func main() {
 	// Start LAN-XI client
 	client := NewLANXIClient(config.lanxiHost)
 	ctx, cancel := context.WithTimeout(context.Background(),
-		10*time.Second+ // OpenRecorder
+		15*time.Second+ // reboot
+			10*time.Second+ // OpenRecorder
 			5*time.Second+ // CreateRecording
 			10*time.Second+ // ConfigureRecording
 			5*time.Second, // StartMeasurement
@@ -72,6 +73,17 @@ func main() {
 
 	go checkLanxiAlive(config)
 	go func() {
+		logger.Info("Getting Module State")
+		if moduleState, err := client.GetModuleState(ctx); err != nil {
+			logger.Error("Failed to get module state", "error", err)
+			if moduleState != "Idle" {
+				if err := client.Reboot(ctx); err != nil {
+					logger.Error("Failed to reboot module", "error", err)
+				}
+			}
+			cancel()
+			return
+		}
 		logger.Info("Opening recorder")
 		if err := client.OpenRecorder(ctx); err != nil {
 			logger.Error("Failed to open recorder", "error", err)
