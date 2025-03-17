@@ -507,8 +507,7 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 
 				for _, value := range signal.Values {
 					calcValue, _ := value.CalcValue()
-					scaledValue := float64(calcValue) * scaleFactor
-
+					scaledValue := float64(calcValue) * scaleFactor / (1 << 23)
 					if scaledValue < stat.min {
 						stat.min = scaledValue
 					}
