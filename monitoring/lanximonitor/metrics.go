@@ -27,6 +27,14 @@ var (
 		},
 		[]string{"device_id", "location", "channel"},
 	)
+	lanxiPeakFrequency = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "lanxi",
+			Name:      "peak_frequency",
+			Help:      "Dominant frequency peak in Hz",
+		},
+		[]string{"device_id", "location", "channel"},
+	)
 )
 
 func RegisterMetrics() {
@@ -34,5 +42,6 @@ func RegisterMetrics() {
 		lanxiUp,
 		lanxiAmplitudeMin,
 		lanxiAmplitudeMax,
+		lanxiPeakFrequency,
 	)
 }
