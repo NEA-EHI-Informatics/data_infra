@@ -33,6 +33,10 @@ type SignalBlock struct {
 	Values         []int32
 }
 
+type channelStats struct {
+	min, max float64
+	count    int
+}
 type frequencyAnalyzer struct {
 	sampleRate  float64
 	windowSize  int
@@ -59,11 +63,6 @@ func NewLANXIClient(host string) *LANXIClient {
 		},
 	}
 }
-
-var (
-	maxAmplitude float64
-	mu           sync.Mutex
-)
 
 func LoadLanxiConfig(filename string) ([]byte, error) {
 	data, err := os.ReadFile(filename)
@@ -429,13 +428,57 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 	defer conn.Close()
 
 	brs := NewSafeStream(conn)
+
+	stats := make(map[SignalID]*channelStats)
+	var statsMutex sync.Mutex
+
 	scaleFactors := make(map[SignalID]float64)
 	var scaleMutex sync.RWMutex
 
 	analyzers := make(map[SignalID]*frequencyAnalyzer)
 	var analyzerMutex sync.RWMutex
 
-	// FFT processing goroutine
+	// Min and max amplitude metrics
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				statsMutex.Lock()
+				for signalID, stat := range stats {
+					if stat.count == 0 {
+						continue
+					}
+
+					// Update metrics
+					lanxiAmplitudeMin.WithLabelValues(
+						cfg.deviceID,
+						cfg.location,
+						fmt.Sprintf("%d", signalID),
+					).Set(stat.min)
+
+					lanxiAmplitudeMax.WithLabelValues(
+						cfg.deviceID,
+						cfg.location,
+						fmt.Sprintf("%d", signalID),
+					).Set(stat.max)
+
+					// Reset stats
+					stat.min = math.MaxFloat64
+					stat.max = -math.MaxFloat64
+					stat.count = 0
+				}
+				statsMutex.Unlock()
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	// Metrics Peak frequency:
 	go func() {
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
@@ -497,8 +540,34 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 				signalID := SignalID(uint16(signal.SignalId))
 
 				scaleMutex.RLock()
-				scaleFactor := scaleFactors[signalID]
+				scaleFactor, ok := scaleFactors[signalID]
+				if !ok {
+					continue
+				}
 				scaleMutex.RUnlock()
+
+				stat, exists := stats[signalID]
+				if !exists {
+					stat = &channelStats{
+						min: math.MaxFloat64,
+						max: -math.MaxFloat64,
+					}
+					stats[signalID] = stat
+				}
+				statsMutex.Unlock()
+
+				for _, value := range signal.Values {
+					calcValue, _ := value.CalcValue()
+					scaledValue := float64(calcValue) * scaleFactor
+
+					if scaledValue < stat.min {
+						stat.min = scaledValue
+					}
+					if scaledValue > stat.max {
+						stat.max = scaledValue
+					}
+					stat.count++
+				}
 
 				analyzerMutex.Lock()
 				if _, exists := analyzers[signalID]; !exists {
@@ -519,9 +588,13 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 					scaledValue := float64(calcValue) * scaleFactor / (1 << 23)
 
 					analyzer.bufferMutex.Lock()
+					// Keep last N samples
 					if len(analyzer.buffer) >= 2048 {
-						analyzer.buffer = analyzer.buffer[1:]
+						analyzer.buffer = analyzer.buffer[len(analyzer.buffer)-2048:]
 					}
+					// if len(analyzer.buffer) >= 2048 {
+					// 	analyzer.buffer = analyzer.buffer[1:]
+					// }
 					analyzer.buffer = append(analyzer.buffer, scaledValue)
 					analyzer.bufferMutex.Unlock()
 				}
@@ -570,91 +643,6 @@ func reconnectWithBackoff(cfg *config, c *LANXIClient) {
 		time.Sleep(backoff)
 	}
 	logger.Error("Failed to reconnect after multiple attempts")
-}
-
-func handleSignalData(
-	signalData *openapi.OpenapiMessage_SignalData,
-	cfg *config,
-	scaleMutex *sync.RWMutex,
-	scaleFactors map[SignalID]float64,
-	analyzerMutex *sync.RWMutex,
-	analyzers map[SignalID]*frequencyAnalyzer,
-	c *LANXIClient,
-	ctx context.Context,
-) {
-	for _, signal := range signalData.Signals {
-		signalID := SignalID(uint16(signal.SignalId))
-
-		// Get scale factor safely
-		scaleMutex.RLock()
-		scaleFactor := scaleFactors[signalID]
-		scaleMutex.RUnlock()
-
-		// Initialize analyzer if needed
-		analyzerMutex.Lock()
-		if _, exists := analyzers[signalID]; !exists {
-			analyzers[signalID] = &frequencyAnalyzer{
-				sampleRate: c.sampleRate,
-				windowSize: 1024,
-				buffer:     make([]float64, 0, 2048),
-				signalID:   signalID,
-				deviceID:   cfg.deviceID,
-				location:   cfg.location,
-			}
-		}
-		analyzer := analyzers[signalID]
-		analyzerMutex.Unlock()
-
-		// Process samples
-		for _, value := range signal.Values {
-			calcValue, _ := value.CalcValue()
-			scaledValue := float64(calcValue) * scaleFactor / (1 << 23)
-
-			analyzer.bufferMutex.Lock()
-			// Maintain buffer capacity
-			if len(analyzer.buffer) >= 2048 {
-				analyzer.buffer = analyzer.buffer[1:]
-			}
-			analyzer.buffer = append(analyzer.buffer, scaledValue)
-			analyzer.bufferMutex.Unlock()
-		}
-	}
-}
-
-func handleInterpretation(
-	interpretations *openapi.OpenapiMessage_Interpretations,
-	scaleMutex *sync.RWMutex,
-	scaleFactors map[SignalID]float64,
-	analyzerMutex *sync.RWMutex,
-	analyzers map[SignalID]*frequencyAnalyzer,
-) {
-	for _, interpretation := range interpretations.Interpretations {
-		if interpretation.DescriptorType == openapi.OpenapiMessage_Interpretation_EDescriptorType__ScaleFactor {
-			signalID := SignalID(interpretation.SignalId)
-
-			// Update scale factors
-			if value, ok := interpretation.Value.(float64); ok {
-				scaleMutex.Lock()
-				scaleFactors[signalID] = value
-				scaleMutex.Unlock()
-
-				// Update analyzer if exists
-				analyzerMutex.RLock()
-				if analyzer, exists := analyzers[signalID]; exists {
-					analyzer.scaleFactor = value
-				}
-				analyzerMutex.RUnlock()
-			}
-		}
-	}
-}
-
-func handleDataQuality(dataQuality *openapi.OpenapiMessage_DataQuality) {
-	for _, quality := range dataQuality.Qualities {
-		if overload, _ := quality.ValidityFlags.Overload(); overload {
-			logger.Warn("Signal overload detected", "signal_id", quality.SignalId)
-		}
-	}
 }
 
 func findClosestSampleRate(bandwidth float64, supported []float64) float64 {
