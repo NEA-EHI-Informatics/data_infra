@@ -474,14 +474,17 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 				for signalID, analyzer := range analyzers {
 					analyzer.bufferMutex.Lock()
 					if len(analyzer.buffer) >= analyzer.windowSize {
-						data := make([]float64, analyzer.windowSize)
-						copy(data, analyzer.buffer[:analyzer.windowSize])
-						analyzer.buffer = analyzer.buffer[analyzer.windowSize/2:]
+						windowData := make([]float64, analyzer.windowSize)
+						copy(windowData, analyzer.buffer[:analyzer.windowSize])
+						analyzer.buffer = analyzer.buffer[analyzer.windowSize:]
 
-						go func(a *frequencyAnalyzer, sID SignalID, d []float64) {
-							windowed := d
-							window.Apply(windowed, window.Hamming)
-							fftData := fft.FFTReal(windowed)
+						// data := make([]float64, analyzer.windowSize)
+						// copy(data, analyzer.buffer[:analyzer.windowSize])
+						// analyzer.buffer = analyzer.buffer[analyzer.windowSize/2:]
+
+						go func(a *frequencyAnalyzer, sID SignalID, data []float64) {
+							window.Apply(data, window.Hamming)
+							fftData := fft.FFTReal(data)
 
 							minAmp, maxAmp := math.MaxFloat64, -math.MaxFloat64
 							for i := range fftData {
@@ -505,7 +508,7 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 									fmt.Sprintf("%d", signalID),
 								).Set(maxAmp)
 							}
-						}(analyzer, signalID, data)
+						}(analyzer, signalID, windowData)
 					}
 					analyzer.bufferMutex.Unlock()
 				}
@@ -556,10 +559,6 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 					scaledValue := (float64(calcValue) * scaleFactor) / (1 << 23)
 
 					analyzer.bufferMutex.Lock()
-					// Keep last N samples
-					if len(analyzer.buffer) >= 4096 {
-						analyzer.buffer = analyzer.buffer[len(analyzer.buffer)-4096:]
-					}
 					analyzer.buffer = append(analyzer.buffer, scaledValue)
 					analyzer.bufferMutex.Unlock()
 				}
