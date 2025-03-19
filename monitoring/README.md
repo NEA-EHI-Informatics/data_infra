@@ -66,7 +66,7 @@ Because the sensor is connected to the PI via LAN, we would like the IP to the L
 
 # Alloy (Metrics Scraper)
 
-For metrics to be pushed to grafana, a metrics scraper, in this case [Granfana Alloy](https://grafana.com/docs/alloy/latest/), is required. Alloy is a lightweight scraper on baremetal machine where `lanximonitor` is running. Alloy scrapes `/metrics` and pushes telemetry data to a timeseries database (eg. Grafana Mimir or Prometheus). See [config](./alloy/config.alloy) for more information.
+For metrics to be pushed to grafana, a metrics scraper, in this case [Granfana Alloy](https://grafana.com/docs/alloy/latest/), is required. Alloy is a lightweight scraper on baremetal machine where `lanximonitor` is running. Alloy scrapes `/metrics` and pushes telemetry data to a timeseries database (eg. Grafana Mimir or Prometheus). See [config](./lanximonitor/grafana/alloy/config.alloy) for more information.
 
 
 ##  1. <a name='Pre-requisites'></a>Pre-requisites
@@ -125,7 +125,7 @@ sudo systemctl enable lanxi-monitor
 
    Confirm by running: `systemctl list-units --type=service | grep alloy` 
 
-2. Set up [config](./alloy/config.alloy). the object below includes scraping `/metrics` from `lanximonitor`. 
+2. Set up [config](./lanximonitor/grafana/alloy/config.alloy). the object below includes scraping `/metrics` from `lanximonitor`. 
 
     * See example of config:
 

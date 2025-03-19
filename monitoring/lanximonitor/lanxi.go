@@ -33,10 +33,6 @@ type SignalBlock struct {
 	Values         []int32
 }
 
-type channelStats struct {
-	min, max float64
-	count    int
-}
 type frequencyAnalyzer struct {
 	sampleRate  float64
 	windowSize  int
@@ -261,8 +257,8 @@ func (c *LANXIClient) ConfigureRecording(ctx context.Context, cfg *config) error
 	}
 	supportedRates := []float64{131072, 65536, 32768, 16384, 8192, 4096}
 
-	// For 51.2 kHz bandwidth
-	c.sampleRate = findClosestSampleRate(51200, supportedRates)
+	// For 1.6 kHz bandwidth
+	c.sampleRate = findClosestSampleRate(1600, supportedRates)
 	startTime := time.Now()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(jsonData))
@@ -460,54 +456,11 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 
 	brs := NewSafeStream(conn)
 
-	stats := make(map[SignalID]*channelStats)
-	var statsMutex sync.Mutex
-
 	scaleFactors := make(map[SignalID]float64)
 	var scaleMutex sync.RWMutex
 
 	analyzers := make(map[SignalID]*frequencyAnalyzer)
 	var analyzerMutex sync.RWMutex
-
-	// Min and max amplitude metrics
-	go func() {
-		ticker := time.NewTicker(1 * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				statsMutex.Lock()
-				for signalID, stat := range stats {
-					if stat.count == 0 {
-						continue
-					}
-
-					// Update metrics
-					lanxiAmplitudeMin.WithLabelValues(
-						cfg.deviceID,
-						cfg.location,
-						fmt.Sprintf("%d", signalID),
-					).Set(stat.min)
-
-					lanxiAmplitudeMax.WithLabelValues(
-						cfg.deviceID,
-						cfg.location,
-						fmt.Sprintf("%d", signalID),
-					).Set(stat.max)
-
-					// Reset stats
-					stat.min = math.MaxFloat64
-					stat.max = -math.MaxFloat64
-					stat.count = 0
-				}
-				statsMutex.Unlock()
-
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
 
 	// Metrics Peak frequency:
 	go func() {
@@ -530,21 +483,28 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 							window.Apply(windowed, window.Hamming)
 							fftData := fft.FFTReal(windowed)
 
-							maxMag, maxIdx := 0.0, 0
-							for i := 0; i < len(fftData)/2; i++ {
+							minAmp, maxAmp := math.MaxFloat64, -math.MaxFloat64
+							for i := range fftData {
 								re := real(fftData[i])
-								im := imag(fftData[i])
-								if mag := math.Hypot(re, im); mag > maxMag {
-									maxMag, maxIdx = mag, i
+								// im := imag(fftData[i])
+								if re > maxAmp {
+									maxAmp = re
 								}
-							}
+								if re < minAmp {
+									minAmp = re
+								}
 
-							peakFreq := float64(maxIdx) * a.sampleRate / float64(a.windowSize)
-							lanxiPeakFrequency.WithLabelValues(
-								a.deviceID,
-								a.location,
-								fmt.Sprintf("%d", sID),
-							).Set(peakFreq)
+								lanxiAmplitudeMin.WithLabelValues(
+									cfg.deviceID,
+									cfg.location,
+									fmt.Sprintf("%d", signalID),
+								).Set(minAmp)
+								lanxiAmplitudeMax.WithLabelValues(
+									cfg.deviceID,
+									cfg.location,
+									fmt.Sprintf("%d", signalID),
+								).Set(maxAmp)
+							}
 						}(analyzer, signalID, data)
 					}
 					analyzer.bufferMutex.Unlock()
@@ -577,35 +537,11 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 				}
 				scaleMutex.RUnlock()
 
-				statsMutex.Lock()
-				stat, exists := stats[signalID]
-				if !exists {
-					stat = &channelStats{
-						min: math.MaxFloat64,
-						max: -math.MaxFloat64,
-					}
-					stats[signalID] = stat
-				}
-				statsMutex.Unlock()
-
-				for _, value := range signal.Values {
-					calcValue, _ := value.CalcValue()
-					scaledValue := float64(calcValue) * scaleFactor
-
-					if scaledValue < stat.min {
-						stat.min = scaledValue
-					}
-					if scaledValue > stat.max {
-						stat.max = scaledValue
-					}
-					stat.count++
-				}
-
 				analyzerMutex.Lock()
 				if _, exists := analyzers[signalID]; !exists {
 					analyzers[signalID] = &frequencyAnalyzer{
 						sampleRate: c.sampleRate, // Set during configuration
-						windowSize: 1024,
+						windowSize: 4096,
 						buffer:     make([]float64, 0, 2048),
 						signalID:   signalID,
 						deviceID:   cfg.deviceID,
@@ -617,16 +553,13 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 
 				for _, value := range signal.Values {
 					calcValue, _ := value.CalcValue()
-					scaledValue := float64(calcValue) * scaleFactor / (1 << 23)
+					scaledValue := (float64(calcValue) * scaleFactor) / (1 << 23)
 
 					analyzer.bufferMutex.Lock()
 					// Keep last N samples
-					if len(analyzer.buffer) >= 2048 {
-						analyzer.buffer = analyzer.buffer[len(analyzer.buffer)-2048:]
+					if len(analyzer.buffer) >= 4096 {
+						analyzer.buffer = analyzer.buffer[len(analyzer.buffer)-4096:]
 					}
-					// if len(analyzer.buffer) >= 2048 {
-					// 	analyzer.buffer = analyzer.buffer[1:]
-					// }
 					analyzer.buffer = append(analyzer.buffer, scaledValue)
 					analyzer.bufferMutex.Unlock()
 				}
