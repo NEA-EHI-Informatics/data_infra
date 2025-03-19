@@ -58,15 +58,15 @@ func main() {
 	}()
 
 	// Start LAN-XI client
-	client := NewLANXIClient(config.lanxiHost)
 	ctx, cancel := context.WithTimeout(context.Background(),
-		15*time.Second+ // reboot
+		60*time.Second+ // reboot
 			10*time.Second+ // OpenRecorder
 			5*time.Second+ // CreateRecording
 			10*time.Second+ // ConfigureRecording
 			5*time.Second, // StartMeasurement
 	)
 	defer cancel()
+	client := NewLANXIClient(config.lanxiHost, ctx)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -76,17 +76,23 @@ func main() {
 
 	go func() {
 		logger.Info("Getting Module State")
-		if moduleState, err := client.GetModuleState(ctx); err != nil {
+		moduleState, err := client.GetModuleState(ctx)
+		if err != nil {
 			fatalErrors <- fmt.Errorf("GetModuleState failed: %w", err)
 			logger.Error("Failed to get module state", "error", err)
-			if moduleState != "Idle" {
-				if err := client.Reboot(ctx); err != nil {
-					logger.Error("Failed to reboot module", "error", err)
-				}
-			}
 			cancel()
 			return
 		}
+
+		if moduleState != "Idle" {
+			if err := client.Reboot(ctx); err != nil {
+				logger.Error("Failed to reboot module", "error", err)
+			} else {
+				logger.Info("Rebooting module, waiting for it to restart...")
+				time.Sleep(30 * time.Second)
+			}
+		}
+
 		logger.Info("Opening recorder")
 		if err := client.OpenRecorder(ctx); err != nil {
 			logger.Error("Failed to open recorder", "error", err)

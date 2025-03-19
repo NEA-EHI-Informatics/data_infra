@@ -30,12 +30,12 @@
                 "sensitivity": 1,
                 "serialNumber": 31700,
                 "type": {
-                    "model": "",
-                    "number": "None",
+                    "model": "B",
+                    "number": "4533",
                     "prefix": "",
                     "variant": ""
                 },
-                "unit": "V"
+                "unit": "m/s^2"
             }
         },
         {
@@ -68,12 +68,12 @@
                 "sensitivity": 1,
                 "serialNumber": 31700,
                 "type": {
-                    "model": "",
-                    "number": "None",
+                    "model": "B",
+                    "number": "4533",
                     "prefix": "",
                     "variant": ""
                 },
-                "unit": "V"
+                "unit": "m/s^2"
             }
         },
         {

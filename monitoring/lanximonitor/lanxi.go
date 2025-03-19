@@ -55,11 +55,19 @@ type LANXIClient struct {
 	sampleRate float64
 }
 
-func NewLANXIClient(host string) *LANXIClient {
+func NewLANXIClient(host string, ctx context.Context) *LANXIClient {
+	deadline, ok := ctx.Deadline()
+	var timeout time.Duration
+	if ok {
+		timeout = time.Until(deadline) // Set the timeout based on the context deadline
+	} else {
+		timeout = 10 * time.Second // Fallback to a default value if no deadline
+	}
+
 	return &LANXIClient{
 		host: host,
 		client: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: timeout, // Set client timeout based on context deadline
 		},
 	}
 }
@@ -74,6 +82,9 @@ func LoadLanxiConfig(filename string) ([]byte, error) {
 	var jsonData map[string]interface{}
 	if err := json.Unmarshal(data, &jsonData); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	} else {
+		prettyJSON, _ := json.MarshalIndent(jsonData, "", "  ")
+		logger.Info("Parsed config", "config", string(prettyJSON))
 	}
 
 	return data, nil
@@ -119,8 +130,8 @@ func (c *LANXIClient) GetModuleState(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("moduleState field not found in response")
 	}
 
-	// Type assertion to ensure it's a string
 	moduleStateStr, ok := moduleState.(string)
+	logger.Info("Module state", "state", moduleStateStr)
 	if !ok {
 		return "", fmt.Errorf("moduleState is not a string (got type %T)", moduleState)
 	}
@@ -235,6 +246,14 @@ func (c *LANXIClient) WaitForTransducerDetection(ctx context.Context) error {
 }
 
 func (c *LANXIClient) ConfigureRecording(ctx context.Context, cfg *config) error {
+
+	if deadline, ok := ctx.Deadline(); ok {
+		logger.Info("ConfigureRecording deadline",
+			"deadline", deadline.Format(time.RFC3339Nano),
+			"time_remaining (s)", time.Until(deadline).Seconds(),
+		)
+	}
+
 	url := fmt.Sprintf("http://%s/rest/rec/channels/input", c.host)
 	jsonData, err := LoadLanxiConfig(cfg.lanxiConfig)
 	if err != nil {
@@ -244,6 +263,7 @@ func (c *LANXIClient) ConfigureRecording(ctx context.Context, cfg *config) error
 
 	// For 51.2 kHz bandwidth
 	c.sampleRate = findClosestSampleRate(51200, supportedRates)
+	startTime := time.Now()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -251,8 +271,15 @@ func (c *LANXIClient) ConfigureRecording(ctx context.Context, cfg *config) error
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+
 	resp, err := c.client.Do(req)
 	if err != nil {
+		// Check if the error is due to context deadline exceeded
+		if errors.Is(err, context.DeadlineExceeded) {
+			elapsedTime := time.Since(startTime)
+			// Log the elapsed time in human-readable format
+			return fmt.Errorf("context deadline exceeded after %.2f seconds for ConfigureRecording", elapsedTime.Seconds())
+		}
 		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
@@ -261,6 +288,10 @@ func (c *LANXIClient) ConfigureRecording(ctx context.Context, cfg *config) error
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected response status: %d - %s", resp.Status, string(body))
 	}
+
+	// Log the time taken for the operation
+	elapsedTime := time.Since(startTime)
+	logger.Info("ConfigureRecording", "Duration", elapsedTime.Seconds())
 
 	return nil
 }
@@ -546,6 +577,7 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 				}
 				scaleMutex.RUnlock()
 
+				statsMutex.Lock()
 				stat, exists := stats[signalID]
 				if !exists {
 					stat = &channelStats{
