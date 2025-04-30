@@ -58,20 +58,41 @@ func main() {
 	}()
 
 	// Start LAN-XI client
-	client := NewLANXIClient(config.lanxiHost)
 	ctx, cancel := context.WithTimeout(context.Background(),
-		10*time.Second+ // OpenRecorder
+		60*time.Second+ // reboot
+			10*time.Second+ // OpenRecorder
 			5*time.Second+ // CreateRecording
 			10*time.Second+ // ConfigureRecording
 			5*time.Second, // StartMeasurement
 	)
 	defer cancel()
+	client := NewLANXIClient(config.lanxiHost, ctx)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go checkLanxiAlive(config)
+	fatalErrors := make(chan error, 1)
+
 	go func() {
+		logger.Info("Getting Module State")
+		moduleState, err := client.GetModuleState(ctx)
+		if err != nil {
+			fatalErrors <- fmt.Errorf("GetModuleState failed: %w", err)
+			logger.Error("Failed to get module state", "error", err)
+			cancel()
+			return
+		}
+
+		if moduleState != "Idle" {
+			if err := client.Reboot(ctx); err != nil {
+				logger.Error("Failed to reboot module", "error", err)
+			} else {
+				logger.Info("Rebooting module, waiting for it to restart...")
+				time.Sleep(30 * time.Second)
+			}
+		}
+
 		logger.Info("Opening recorder")
 		if err := client.OpenRecorder(ctx); err != nil {
 			logger.Error("Failed to open recorder", "error", err)
@@ -93,6 +114,7 @@ func main() {
 		}
 		logger.Info("Configuring recording")
 		if err := client.ConfigureRecording(ctx, config); err != nil {
+			fatalErrors <- fmt.Errorf("ConfigureRecording failed (critical): %w", err)
 			logger.Error("ConfigureRecording failed", "error", err)
 			cancel()
 			return
@@ -117,9 +139,23 @@ func main() {
 			return
 		}
 	}()
-	<-quit
-	logger.Info("Shutting down server...")
 
+	select {
+	case <-quit:
+		logger.Info("Shutting down via signal")
+	case err := <-fatalErrors:
+		logger.Error("Fatal error encountered - exiting", "error", err)
+		// Trigger cleanup but exit with error code
+		cancel()
+
+		// Allow brief time for cleanup (optional)
+		select {
+		case <-time.After(2 * time.Second):
+		case <-ctx.Done():
+		}
+
+		os.Exit(1) // Exit with non-zero status
+	}
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 

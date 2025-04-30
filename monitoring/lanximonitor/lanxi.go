@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/kaitai-io/kaitai_struct_go_runtime/kaitai"
+	"github.com/mjibson/go-dsp/fft"
+	"github.com/mjibson/go-dsp/window"
 )
 
 type SignalData struct {
@@ -31,25 +33,40 @@ type SignalBlock struct {
 	Values         []int32
 }
 
-type LANXIClient struct {
-	host   string
-	client *http.Client
-	port   int
+type frequencyAnalyzer struct {
+	sampleRate  float64
+	windowSize  int
+	scaleFactor float64
+	bufferMutex sync.Mutex
+	buffer      []float64
+	signalID    SignalID
+	deviceID    string
+	location    string
 }
 
-func NewLANXIClient(host string) *LANXIClient {
+type LANXIClient struct {
+	host       string
+	client     *http.Client
+	port       int
+	sampleRate float64
+}
+
+func NewLANXIClient(host string, ctx context.Context) *LANXIClient {
+	deadline, ok := ctx.Deadline()
+	var timeout time.Duration
+	if ok {
+		timeout = time.Until(deadline) // Set the timeout based on the context deadline
+	} else {
+		timeout = 10 * time.Second // Fallback to a default value if no deadline
+	}
+
 	return &LANXIClient{
 		host: host,
 		client: &http.Client{
-			Timeout: 10 * time.Second,
+			Timeout: timeout, // Set client timeout based on context deadline
 		},
 	}
 }
-
-var (
-	maxAmplitude float64
-	mu           sync.Mutex
-)
 
 func LoadLanxiConfig(filename string) ([]byte, error) {
 	data, err := os.ReadFile(filename)
@@ -61,6 +78,9 @@ func LoadLanxiConfig(filename string) ([]byte, error) {
 	var jsonData map[string]interface{}
 	if err := json.Unmarshal(data, &jsonData); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	} else {
+		prettyJSON, _ := json.MarshalIndent(jsonData, "", "  ")
+		logger.Info("Parsed config", "config", string(prettyJSON))
 	}
 
 	return data, nil
@@ -78,6 +98,41 @@ func (c *LANXIClient) OpenRecorder(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 	return nil
+}
+
+func (c *LANXIClient) GetModuleState(ctx context.Context) (string, error) {
+	url := fmt.Sprintf("http://%s/rest/rec/module/info", c.host)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("request failed with status code: %d", resp.StatusCode)
+	}
+
+	var info map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return "", err
+	}
+
+	moduleState, exists := info["moduleState"]
+	if !exists {
+		return "", fmt.Errorf("moduleState field not found in response")
+	}
+
+	moduleStateStr, ok := moduleState.(string)
+	logger.Info("Module state", "state", moduleStateStr)
+	if !ok {
+		return "", fmt.Errorf("moduleState is not a string (got type %T)", moduleState)
+	}
+
+	return moduleStateStr, nil
 }
 
 func (c *LANXIClient) GetModuleInfo(ctx context.Context) (map[string]interface{}, error) {
@@ -187,11 +242,24 @@ func (c *LANXIClient) WaitForTransducerDetection(ctx context.Context) error {
 }
 
 func (c *LANXIClient) ConfigureRecording(ctx context.Context, cfg *config) error {
+
+	if deadline, ok := ctx.Deadline(); ok {
+		logger.Info("ConfigureRecording deadline",
+			"deadline", deadline.Format(time.RFC3339Nano),
+			"time_remaining (s)", time.Until(deadline).Seconds(),
+		)
+	}
+
 	url := fmt.Sprintf("http://%s/rest/rec/channels/input", c.host)
 	jsonData, err := LoadLanxiConfig(cfg.lanxiConfig)
 	if err != nil {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
+	supportedRates := []float64{131072, 65536, 32768, 16384, 8192, 4096}
+
+	// For 1.6 kHz bandwidth
+	c.sampleRate = findClosestSampleRate(1600, supportedRates)
+	startTime := time.Now()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -199,8 +267,15 @@ func (c *LANXIClient) ConfigureRecording(ctx context.Context, cfg *config) error
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+
 	resp, err := c.client.Do(req)
 	if err != nil {
+		// Check if the error is due to context deadline exceeded
+		if errors.Is(err, context.DeadlineExceeded) {
+			elapsedTime := time.Since(startTime)
+			// Log the elapsed time in human-readable format
+			return fmt.Errorf("context deadline exceeded after %.2f seconds for ConfigureRecording", elapsedTime.Seconds())
+		}
 		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
@@ -209,6 +284,10 @@ func (c *LANXIClient) ConfigureRecording(ctx context.Context, cfg *config) error
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("unexpected response status: %d - %s", resp.Status, string(body))
 	}
+
+	// Log the time taken for the operation
+	elapsedTime := time.Since(startTime)
+	logger.Info("ConfigureRecording", "Duration", elapsedTime.Seconds())
 
 	return nil
 }
@@ -237,6 +316,20 @@ func (c *LANXIClient) StartStreaming(ctx context.Context) error {
 func (c *LANXIClient) StartMeasurement(ctx context.Context) error {
 	url := fmt.Sprintf("http://%s/rest/rec/measurements", c.host)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	return nil
+}
+
+func (c *LANXIClient) Reboot(ctx context.Context) error {
+	url := fmt.Sprintf("http://%s/rest/rec/reboot", c.host)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, nil)
 	if err != nil {
 		return err
 	}
@@ -353,7 +446,6 @@ func (b *bufferedReadSeeker) Seek(offset int64, whence int) (int64, error) {
 
 type SignalID uint16
 
-// Add this new function to process the data stream
 func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.host, c.port))
 	if err != nil {
@@ -361,74 +453,77 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 		return err
 	}
 	defer conn.Close()
-	brs := newBufferedReadSeeker(conn)
+
+	brs := NewSafeStream(conn)
+
 	scaleFactors := make(map[SignalID]float64)
 	var scaleMutex sync.RWMutex
 
-	type channelStats struct {
-		min, max float64
-		count    int
-	}
-	stats := make(map[SignalID]*channelStats)
-	var statsMutex sync.Mutex
+	analyzers := make(map[SignalID]*frequencyAnalyzer)
+	var analyzerMutex sync.RWMutex
 
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	// Metrics updater
+	// Metrics Peak frequency:
 	go func() {
-		for range ticker.C {
-			statsMutex.Lock()
-			for signalID, stat := range stats {
-				if stat.count == 0 {
-					continue
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				analyzerMutex.RLock()
+				for signalID, analyzer := range analyzers {
+					analyzer.bufferMutex.Lock()
+					if len(analyzer.buffer) >= analyzer.windowSize {
+						windowData := make([]float64, analyzer.windowSize)
+						copy(windowData, analyzer.buffer[:analyzer.windowSize])
+						analyzer.buffer = analyzer.buffer[analyzer.windowSize:]
+
+						// data := make([]float64, analyzer.windowSize)
+						// copy(data, analyzer.buffer[:analyzer.windowSize])
+						// analyzer.buffer = analyzer.buffer[analyzer.windowSize/2:]
+
+						go func(a *frequencyAnalyzer, sID SignalID, data []float64) {
+							window.Apply(data, window.Hamming)
+							fftData := fft.FFTReal(data)
+
+							minAmp, maxAmp := math.MaxFloat64, -math.MaxFloat64
+							for i := range fftData {
+								re := real(fftData[i])
+								// im := imag(fftData[i])
+								if re > maxAmp {
+									maxAmp = re
+								}
+								if re < minAmp {
+									minAmp = re
+								}
+
+								lanxiAmplitudeMin.WithLabelValues(
+									cfg.deviceID,
+									cfg.location,
+									fmt.Sprintf("%d", signalID),
+								).Set(minAmp)
+								lanxiAmplitudeMax.WithLabelValues(
+									cfg.deviceID,
+									cfg.location,
+									fmt.Sprintf("%d", signalID),
+								).Set(maxAmp)
+							}
+						}(analyzer, signalID, windowData)
+					}
+					analyzer.bufferMutex.Unlock()
 				}
+				analyzerMutex.RUnlock()
 
-				scaleMutex.RLock()
-				scaleFactor, ok := scaleFactors[signalID]
-				scaleMutex.RUnlock()
-
-				if ok {
-					lanxiAmplitudeMin.WithLabelValues(
-						cfg.deviceID,
-						cfg.location,
-						fmt.Sprintf("%d", signalID),
-					).Set(stat.min * scaleFactor)
-
-					lanxiAmplitudeMax.WithLabelValues(
-						cfg.deviceID,
-						cfg.location,
-						fmt.Sprintf("%d", signalID),
-					).Set(stat.max * scaleFactor)
-				}
-
-				// Reset stats
-				stat.min = math.MaxFloat64
-				stat.max = -math.MaxFloat64
-				stat.count = 0
+			case <-ctx.Done():
+				return
 			}
-			statsMutex.Unlock()
 		}
 	}()
 
 	for {
-		// Read message using Kaitai parser
 		msg := openapi.NewOpenapiMessage()
-		err = msg.Read(kaitai.NewStream(brs), nil, nil)
-		if err != nil {
-			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-				logger.Info("Stream connection closed, reconnecting...")
-				conn.Close()
-				conn, err = net.Dial("tcp", fmt.Sprintf("%s:%d", cfg.lanxiHost, c.port))
-				// TODO(wesley): add reconnection logic with backoff
-				continue
-			} else if strings.Contains(err.Error(), "exceeds maximum allowed") {
-				logger.Error("Invalid message size, resetting connection")
-				conn.Close()
-				// Reconnect logic
-				continue
-			}
-			logger.Error("Failed to parse message", "error", err)
+		if err := msg.Read(kaitai.NewStream(brs), nil, nil); err != nil {
+			handleStreamError(err, cfg, c, conn)
 			continue
 		}
 
@@ -437,36 +532,35 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 			signalData := msg.Message.(*openapi.OpenapiMessage_SignalData)
 			for _, signal := range signalData.Signals {
 				signalID := SignalID(uint16(signal.SignalId))
+
 				scaleMutex.RLock()
 				scaleFactor, ok := scaleFactors[signalID]
-				scaleMutex.RUnlock()
-
 				if !ok {
 					continue
 				}
+				scaleMutex.RUnlock()
 
-				statsMutex.Lock()
-				stat, exists := stats[signalID]
-				if !exists {
-					stat = &channelStats{
-						min: math.MaxFloat64,
-						max: -math.MaxFloat64,
+				analyzerMutex.Lock()
+				if _, exists := analyzers[signalID]; !exists {
+					analyzers[signalID] = &frequencyAnalyzer{
+						sampleRate: c.sampleRate, // Set during configuration
+						windowSize: 4096,
+						buffer:     make([]float64, 0, 2048),
+						signalID:   signalID,
+						deviceID:   cfg.deviceID,
+						location:   cfg.location,
 					}
-					stats[signalID] = stat
 				}
-				statsMutex.Unlock()
+				analyzer := analyzers[signalID]
+				analyzerMutex.Unlock()
 
 				for _, value := range signal.Values {
 					calcValue, _ := value.CalcValue()
-					scaledValue := float64(calcValue) * scaleFactor
+					scaledValue := (float64(calcValue) * scaleFactor) / (1 << 23)
 
-					if scaledValue < stat.min {
-						stat.min = scaledValue
-					}
-					if scaledValue > stat.max {
-						stat.max = scaledValue
-					}
-					stat.count++
+					analyzer.bufferMutex.Lock()
+					analyzer.buffer = append(analyzer.buffer, scaledValue)
+					analyzer.bufferMutex.Unlock()
 				}
 			}
 
@@ -475,20 +569,58 @@ func (c *LANXIClient) ProcessDataStream(ctx context.Context, cfg *config) error 
 			for _, interpretation := range interpretations.Interpretations {
 				if interpretation.DescriptorType == openapi.OpenapiMessage_Interpretation_EDescriptorType__ScaleFactor {
 					signalID := SignalID(interpretation.SignalId)
-					scaleMutex.Lock()
-					scaleFactors[signalID] = interpretation.Value.(float64)
-					scaleMutex.Unlock()
-				}
-			}
-
-		case openapi.OpenapiMessage_Header_EMessageType__EDataQuality:
-			// Handle data quality messages if needed
-			dataQuality := msg.Message.(*openapi.OpenapiMessage_DataQuality)
-			for _, quality := range dataQuality.Qualities {
-				if overload, _ := quality.ValidityFlags.Overload(); overload {
-					logger.Warn("Signal overload detected", "signal_id", quality.SignalId)
+					if value, ok := interpretation.Value.(float64); ok {
+						scaleMutex.Lock()
+						scaleFactors[signalID] = value
+						scaleMutex.Unlock()
+					}
 				}
 			}
 		}
 	}
+}
+
+// Helper functions for better code organization
+func handleStreamError(err error, cfg *config, c *LANXIClient, conn net.Conn) {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		logger.Info("Stream connection closed, reconnecting...")
+		conn.Close()
+		reconnectWithBackoff(cfg, c)
+	} else if strings.Contains(err.Error(), "exceeds maximum allowed") {
+		logger.Error("Invalid message size, resetting connection")
+		conn.Close()
+		reconnectWithBackoff(cfg, c)
+	} else {
+		logger.Error("Failed to parse message", "error", err)
+	}
+}
+
+func reconnectWithBackoff(cfg *config, c *LANXIClient) {
+	const maxRetries = 5
+	for retries := 0; retries < maxRetries; retries++ {
+		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", cfg.lanxiHost, c.port))
+		if err == nil {
+			conn.Close()
+			return
+		}
+		backoff := time.Duration(math.Pow(2, float64(retries))) * time.Second
+		time.Sleep(backoff)
+	}
+	logger.Error("Failed to reconnect after multiple attempts")
+}
+
+func findClosestSampleRate(bandwidth float64, supported []float64) float64 {
+	// Exactly matches Python's: abs(x - (bandwidth * 2))
+	target := bandwidth * 2
+	closest := supported[0]
+	minDiff := math.Abs(float64(closest) - target)
+
+	for _, rate := range supported[1:] {
+		currentDiff := math.Abs(float64(rate) - target)
+		if currentDiff < minDiff {
+			closest = rate
+			minDiff = currentDiff
+		}
+	}
+	return closest
 }
